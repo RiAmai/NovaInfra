@@ -1,0 +1,148 @@
+---
+# 推荐使用 clang-format 3.4以下版本
+Language: Cpp
+
+#圆括号之后,多行内容,进行对齐
+AlignAfterOpenBracket: Align
+
+# 如果为真（true），连续调整多行
+# 这将会调整连续行中的分配操作符。这将会导致像下面这样的格式：
+# int aaaa = 12;
+# int b    = 23;
+# int ccc  = 23;
+AlignConsecutiveAssignments: false
+# 如果为真（true）, 校准连续的声明。
+# 这将会校准连续多行的声明的名字。这将会导致像下面这样的格式：
+# int         aaaa = 12;
+# float       b = 23;
+# std::string ccc = 23;
+AlignConsecutiveDeclarations: false
+# 在OC中的@property后面添加一个空格。例如：使用“@property (readonly)”而不是“@property(readonly)”
+ObjCSpaceAfterProperty: false
+# OC块中所拍的字符数
+ObjCBlockIndentWidth: 4
+# public/protected/private 等访问修饰符偏移量
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: Inline # 短内联函数允许在一行
+# 对齐连续宏定义的样式。跨越空行对齐，跨越注释对齐
+AlignConsecutiveMacros: AcrossEmptyLinesAndComments
+# 按层次缩进宏定义
+IndentPPDirectives: AfterHash
+# 预处理语句缩进为 2
+PPIndentWidth: 2
+# 数组元素对齐
+AlignArrayOfStructures: Left
+# 如果表达式中包含函数调用，并且函数调用因为表达式太长被放到了下一行，是否缩进
+IndentWrappedFunctionNames: true
+# AlignOperands Align将对齐分割到多行上的单个表达式的操作数
+AlignOperands: Align
+# 对齐连续的尾随的注释
+AlignTrailingComments: true
+# 允许将一个函数声明的所有参数移到下一行.
+AllowAllParametersOfDeclarationOnNextLine: false
+# C风格强制转换后加空格（如(int) x）
+SpaceAfterCStyleCast: false
+# 将简单的语句块放到一个单行
+AllowShortBlocksOnASingleLine: true
+# if (a) return;放单行 属性：Never、WithoutElse没有else的可以放单行、OnlyFirstIf只有第一个if放单行、AllIfsAndElse总是把简短的if, else if和else语句放在同一行。
+AllowShortIfStatementsOnASingleLine: Never
+# BinPackArguments：如果为false，函数调用的参数要么全部在同一行，要么各有一行。
+BinPackArguments: true
+# BinPackParameters：如果为false，函数声明或函数定义的参数将全部在同一行或各有一行。
+BinPackParameters: true
+# 模板声明中断
+AlwaysBreakTemplateDeclarations: Yes
+
+BreakBeforeBraces: Custom
+# 控制单独的大括号换行事件，只有当BreakBeforeBraces设置为Custom时才有效
+BraceWrapping:
+  AfterEnum: false               # 枚举括号不换行
+
+  AfterStruct: false             # 结构体不换行
+
+  AfterCaseLabel: false
+
+  AfterControlStatement: Never   # 不要在控制语句后面用大括号括起来。
+
+  AfterUnion: false
+
+  AfterExternBlock: false
+
+  BeforeCatch: false
+
+  BeforeElse: false
+
+  BeforeLambdaBody: false
+
+  BeforeWhile: false
+
+  AfterFunction: true            # 函数定义的括号单独换行
+
+  AfterClass: true               # 类定义的括号单独换行
+
+  AfterNamespace: false          # 命名空间的括号单独换行
+
+  SplitEmptyFunction: true      # 如果为 false，则空函数体可以放在一行上。
+
+  SplitEmptyRecord: true
+  
+  SplitEmptyNamespace: true
+
+SpaceBeforeParens: Custom
+# 控制圆括号前的单独空格，只有当SpaceBeforeParens设置为Custom时才有效
+SpaceBeforeParensOptions:
+  # 在控制语句关键字(for/if/while…)和开括号之间放置空格
+  AfterControlStatements: true
+  # 在函数声明名称和开括号之间不允许使用空格
+  AfterFunctionDeclarationName: false
+  # 如果为 true，则在 foreach 宏和左括号之间放置空格。
+  AfterForeachMacros: true
+  # 如果为 true，则在 if 宏和左括号之间放置空格。
+  AfterIfMacros: true
+  # 如果为 true，则在运算符重载和左括号之间放置空格。
+  AfterOverloadedOperator: false
+  # 如果为 true，则仅当括号不为空时在左括号之前放置空格。
+  BeforeNonEmptyParentheses: false
+
+# switch的case标签缩进
+IndentCaseLabels: true
+# 指针对齐：右
+PointerAlignment: Right
+ReferenceAlignment: Right         # 引用符号靠近类型（如int &ref）
+# 三元运算符将被放置在换行后
+BreakBeforeTernaryOperators: true
+# 每行字符的限制，0表示没有限制
+ColumnLimit: 110
+# 缩进空格宽度：4
+IndentWidth: 4
+# 保留在赋值操作符之前的空格
+SpaceBeforeAssignmentOperators: true
+# 不要排序include的头文件, Never 不排序
+SortIncludes: Never
+# 保持#include的分组（如系统头文件、本地头文件分组）
+IncludeBlocks: Preserve
+# 允许重新排版注释
+ReflowComments: true
+# 尾行注释前的空格数
+SpacesBeforeTrailingComments: 2
+# 连续空行的最大数
+MaxEmptyLinesToKeep: 999
+# 使用tab字符: Never从不使用, ForIndentation仅在缩进时使用制表符， ForContinuationAndIndentation, Always
+UseTab: Never
+# SpacesInParentheses如果为真（true）, 将会在“(”之后和“)”之前插入空格。
+SpacesInParentheses: false
+# SpacesInSquareBrackets如果为真（true）,将会在“[”之后和“]”之前插入空格。
+SpacesInSquareBrackets: false
+# 如果为true, clang-format将为短名称空间添加丢失的“名称空间的结束注释”并修复无效的现有注释。短命名空间的换行风格由“ShortNamespaceLines”控制。
+# true:                                  false:
+# namespace a {                  vs.     namespace a {
+# foo();                                 foo();
+# bar();                                 bar();
+# } // namespace a                       }
+FixNamespaceComments: false
+# 迭代循环宏
+# 应该被解释为foreach循环而不是函数调用的宏向量。
+# FOREACH(<variable-declaration>, ...)
+#   <loop-body>
+ForEachMacros: [ foreach, Q_FOREACH, BOOST_FOREACH, forever, Q_FOREVER, QBENCHMARK, QBENCHMARK_ONCE ]
+---
