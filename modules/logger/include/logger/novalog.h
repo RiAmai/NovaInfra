@@ -1,0 +1,21 @@
+#pragma once
+
+#include <logger/async/async_log_thread_pool.h>
+#include <logger/async/async_logger.h>
+#include <logger/async/types.h>
+#include <logger/factories/async_factory.h>
+#include <logger/factories/sink_factories.h>
+#include <logger/factories/synchronous_factory.h>
+#include <logger/formatters/formatter.h>
+#include <logger/formatters/pattern_formatter.h>
+#include <logger/global.h>
+#include <logger/logger.h>
+#include <logger/macros.h>
+#include <logger/registry.h>
+#include <logger/sinks/base_sink.h>
+#include <logger/sinks/basic_file_sink.h>
+#include <logger/sinks/console_sink.h>
+#include <logger/sinks/file_event_handlers.h>
+#include <logger/sinks/rotating_file_sink.h>
+#include <logger/sinks/sink.h>
+#include <logger/types.h>

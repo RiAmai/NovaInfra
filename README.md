@@ -38,7 +38,7 @@ NovaCore
 ## Roadmap
 
 - [x] Project initialization
-- [ ] Logger
+- [x] Logger
 - [ ] ThreadPool
 - [ ] Config
 - [ ] SqlitePool
@@ -46,7 +46,59 @@ NovaCore
 - [ ] Plugin
 - [ ] Device Simulator
 
-## Example
+## Logger
+
+The Logger module is complete and provides:
+
+- Synchronous and asynchronous loggers with bounded queue overflow policies
+- Thread-safe and single-threaded console, basic file, and rotating file sinks
+- fmt-style formatting, configurable patterns, level filtering, and flush levels
+- Default and named logger management through the Registry
+- Compile-time log macros with optional source locations
+- Backtrace buffering, file event callbacks, and configurable error handling
+
+For complete usage instructions, see the [Nova Logger Guide](docs/logger.md).
+
+Nova Logger requires C++17 and Linux. Multiple asynchronous workers require thread-safe sinks and do
+not guarantee ordering between messages. Call `nova::log::shutdown()` before process exit to drain the
+Registry worker and flush queued messages.
+
+Configure and build NovaCore with the Logger examples enabled by default:
+
+```bash
+cmake --preset linux-ninja-debug
+cmake --build --preset build-linux-ninja-debug -j2
+```
+
+Create a synchronous console logger:
+
+```cpp
+#include <logger/novalog.h>
+
+int main()
+{
+    auto logger = nova::log::factories::createConsoleLoggerMt("app");
+    logger->setLevel(nova::log::Level::INFO);
+    logger->info("server started on port {}", 8080);
+    logger->flush();
+}
+```
+
+Create an asynchronous console logger backed by the Registry worker:
+
+```cpp
+#include <logger/novalog.h>
+
+int main()
+{
+    nova::log::async::initAsyncLogThreadPool(8192, 1);
+    auto logger = nova::log::factories::createConsoleLoggerMt<
+        nova::log::factories::AsyncFactory>("async-app");
+
+    logger->info("request {} accepted", 17);
+    nova::log::shutdown();
+}
+```
 
 ## Design Principles
 
@@ -60,6 +112,16 @@ NovaCore follows several engineering principles:
 - Small and focused modules
 
 ## Build
+
+`Nova::Logger` bundles the pinned fmt 12.2.0 headers in header-only mode. Installed consumers only need
+`find_package(NovaCore)` and `target_link_libraries(... Nova::Logger)`; NovaCore does not install or require
+a separate fmt library or fmt CMake package. Installations include NovaCore's `LICENSE`,
+`THIRD_PARTY_NOTICES.md`, and the upstream fmt license under `share/licenses/NovaCore`.
+
+## Third-Party Software
+
+NovaCore contains MIT-licensed code derived from spdlog and bundles fmt in header-only mode. Copyright,
+license text, and source mappings are documented in [Third-Party Notices](THIRD_PARTY_NOTICES.md).
 
 ## Philosophy
 

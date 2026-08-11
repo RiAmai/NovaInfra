@@ -1,0 +1,108 @@
+#pragma once
+
+#include <logger/details/mutex.h>
+#include <logger/formatters/pattern_formatter.h>
+#include <logger/sinks/sink.h>
+
+#include <core/os_utils.h>
+#include <stdexcept>
+
+
+NOVA_NAMESPACE_BEGIN
+namespace log::sinks {
+
+// console out sink, supports automatic switching between stdout and stderr.
+template <typename MutexOrPolicy>
+class ConsoleOutSink : public ISink
+{
+public:
+    using MutexTraits = details::ConsoleMutexTraits<MutexOrPolicy>;
+    using Mutex = typename MutexTraits::Mutex;
+    explicit ConsoleOutSink()
+        : mutex_(MutexTraits::mutex()), formatter_(std::make_unique<formatters::PatternFormatter>())
+    {
+    }
+    ~ConsoleOutSink() override = default;
+    NOVA_DISABLE_COPY_MOVE(ConsoleOutSink<MutexOrPolicy>)
+
+    void log(const details::LogMsg &msg) final override
+    {
+        std::lock_guard<Mutex> lock(mutex_);
+        _log(msg);
+    }
+
+    void setPattern(const std::string &pattern) final override
+    {
+        std::lock_guard<Mutex> lock(mutex_);
+        _setFormatter(std::make_unique<formatters::PatternFormatter>(pattern));
+    }
+
+    void setFormatter(std::unique_ptr<formatters::IFormatter> formatter) final override
+    {
+        if (!formatter) {
+            NOVA_THROW(std::invalid_argument("Sink formatter must not be null"));
+        }
+        std::lock_guard<Mutex> lock(mutex_);
+        _setFormatter(std::move(formatter));
+    }
+
+    void flush() final override
+    {
+        std::lock_guard<Mutex> lock(mutex_);
+        _flush();
+    }
+
+    bool isThreadSafe() const noexcept final override
+    {
+        return !std::is_same<Mutex, details::NullMutex>::value;
+    }
+
+protected:
+    void _log(const details::LogMsg &msg)
+    {
+        const auto &dstStr = this->formatMessage(msg);
+        FILE *file;
+        if (msg.level < Level::WARN) {
+            file = stdout;
+        } else {
+            file = stderr;
+        }
+        if (!core::FwriteBytes(dstStr.data(), dstStr.size(), file)) {
+            NOVA_THROW(std::runtime_error("Failed writing log message to console"));
+        }
+    }
+
+    void _flush()
+    {
+        const auto stdoutResult = ::fflush(stdout);
+        const auto stderrResult = ::fflush(stderr);
+        if (stdoutResult != 0) {
+            NOVA_THROW(std::runtime_error("Failed flushing stdout"));
+        }
+        if (stderrResult != 0) {
+            NOVA_THROW(std::runtime_error("Failed flushing stderr"));
+        }
+    }
+
+    const std::string &formatMessage(const details::LogMsg &msg)
+    {
+        formattedBuffer_.clear();
+        formatter_->format(msg, formattedBuffer_);
+        return formattedBuffer_;
+    }
+
+    void _setFormatter(std::unique_ptr<formatters::IFormatter> formatter)
+    {
+        formatter_ = std::move(formatter);
+    }
+
+    Mutex &mutex_;
+    std::unique_ptr<formatters::IFormatter> formatter_;
+    std::string formattedBuffer_;
+};
+
+using ConsoleOutSinkMt = ConsoleOutSink<details::ConsoleMutex>;
+using ConsoleOutSinkSt = ConsoleOutSink<details::ConsoleNullMutex>;
+
+}  // namespace log::sinks
+NOVA_NAMESPACE_END
