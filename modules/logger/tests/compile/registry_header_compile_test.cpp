@@ -2,6 +2,6 @@
 
 int main()
 {
-    auto &registry = nova::log::Registry::instance();
+    auto &registry = novainfra::log::Registry::instance();
     return registry.defaultLogger() ? 0 : 1;
 }

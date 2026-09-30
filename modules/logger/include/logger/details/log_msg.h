@@ -6,15 +6,15 @@
 #include <core/namespace.h>
 
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::details {
 
-struct NOVA_LIB_PORT LogMsg {
+struct NOVAINFRA_LIB_PORT LogMsg {
     LogMsg() = default;
     LogMsg(SystemTimePoint logTime, SourceLocation loc, std::string_view loggerNameIn, Level levelIn,
            std::string_view msg)
         : timestamp(logTime), level(levelIn)
-#ifndef NOVA_NO_THREAD_ID
+#ifndef NOVAINFRA_NO_THREAD_ID
           ,
           threadId(core::ThreadId())
 #endif
@@ -52,4 +52,4 @@ struct NOVA_LIB_PORT LogMsg {
 namespace log {
 using LogMsg = details::LogMsg;
 }
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

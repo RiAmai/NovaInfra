@@ -14,7 +14,7 @@
 #include <system_error>
 #include <tuple>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::sinks {
 
 // rotating file sink
@@ -46,7 +46,7 @@ public:
         Filename basename;
         Filename ext;
         std::tie(basename, ext) = details::FileAssistant::splitByExtension(name);
-        return fmt::format(FMT_STRING(NOVA_FILENAME("{}.{}{}")), basename, idx, ext);
+        return fmt::format(FMT_STRING(NOVAINFRA_FILENAME("{}.{}{}")), basename, idx, ext);
     }
 
     Filename filename() const
@@ -86,7 +86,7 @@ public:
     }
 
 protected:
-    void _log(const details::LogMsg &msg) final override
+    void _log(const details::LogMsg &msg) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
         const auto &formatted = BaseSink<Mutex>::formatMessage(msg);
 
@@ -106,20 +106,20 @@ protected:
         fileAssistant_.write(formatted);
         curSize_ = newSize;
     }
-    void _flush() final override { fileAssistant_.flush(); }
+    void _flush() NOVAINFRA_FINAL NOVAINFRA_OVERRIDE { fileAssistant_.flush(); }
 
 private:
     static void validateMaxSize(std::size_t size)
     {
         if (size == 0) {
-            NOVA_THROW(std::invalid_argument("Rotating sink max size must be greater than zero"));
+            NOVAINFRA_THROW(std::invalid_argument("Rotating sink max size must be greater than zero"));
         }
     }
 
     static void validateMaxFileNum(std::size_t size)
     {
         if (size > static_cast<std::size_t>(kMaxFileNum)) {
-            NOVA_THROW(std::invalid_argument("Rotating sink max file count exceeds kMaxFileNum"));
+            NOVAINFRA_THROW(std::invalid_argument("Rotating sink max file count exceeds kMaxFileNum"));
         }
     }
 
@@ -146,9 +146,9 @@ private:
                     const auto renameError = std::error_code(errno, std::generic_category());
                     fileAssistant_.reopen(false);
                     curSize_ = fileAssistant_.size();
-                    NOVA_THROW(std::system_error(renameError, "rotating_file_sink: failed renaming " +
-                                                                  core::FilenameToStr(src) + " to " +
-                                                                  core::FilenameToStr(dst)));
+                    NOVAINFRA_THROW(std::system_error(renameError, "rotating_file_sink: failed renaming " +
+                                                                       core::FilenameToStr(src) + " to " +
+                                                                       core::FilenameToStr(dst)));
                 }
             }
         }
@@ -174,4 +174,4 @@ using RotatingFileSinkMt = RotatingFileSink<std::mutex>;
 using RotatingFileSinkSt = RotatingFileSink<details::NullMutex>;
 
 }  // namespace log::sinks
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

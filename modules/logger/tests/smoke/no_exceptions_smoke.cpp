@@ -1,7 +1,8 @@
 #include <logger/factories/async_factory.h>
 #include <logger/sinks/basic_file_sink.h>
+#include <logger/sinks/callback_sink.h>
 #include <logger/logger.h>
-#include <logger/novalog.h>
+#include <logger/log.h>
 #include <logger/sinks/rotating_file_sink.h>
 #include <core/os_utils.h>
 
@@ -12,17 +13,17 @@
 
 namespace {
 
-class CountingSink final : public nova::log::sinks::ISink
+class CountingSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
-    void log(const nova::log::LogMsg &msg) override
+    void log(const novainfra::log::LogMsg &msg) NOVAINFRA_OVERRIDE
     {
         ++count;
         lastMessage = msg.message;
     }
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
-    void flush() override {}
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
+    void flush() NOVAINFRA_OVERRIDE {}
 
     int count = 0;
     std::string lastMessage;
@@ -33,23 +34,24 @@ public:
 int main()
 {
     const std::string filename =
-        "/tmp/novacore_logger_no_exceptions_" + std::to_string(nova::core::Pid()) + ".log";
+        "/tmp/novainfra_logger_no_exceptions_" + std::to_string(novainfra::core::Pid()) + ".log";
     const std::string rotatingFilename =
-        "/tmp/novacore_rotating_no_exceptions_" + std::to_string(nova::core::Pid()) + ".log";
-    using RotatingSink = nova::log::sinks::RotatingFileSink<std::mutex>;
+        "/tmp/novainfra_rotating_no_exceptions_" + std::to_string(novainfra::core::Pid()) + ".log";
+    using RotatingSink = novainfra::log::sinks::RotatingFileSink<std::mutex>;
     const auto rotatingHistoryFilename = RotatingSink::calcFilename(rotatingFilename, 1);
     bool valid = false;
     bool asyncValid = false;
+    bool callbackValid = false;
     bool registryValid = false;
 
     {
         auto countingSink = std::make_shared<CountingSink>();
-        auto fileSink = std::make_shared<nova::log::sinks::BasicFileSink<std::mutex>>(filename, true);
+        auto fileSink = std::make_shared<novainfra::log::sinks::BasicFileSink<std::mutex>>(filename, true);
         auto rotatingSink = std::make_shared<RotatingSink>(rotatingFilename, 10, 1);
         fileSink->setPattern("%v");
         rotatingSink->setPattern("%v");
-        nova::log::Logger logger("no-exceptions",
-                                 nova::log::sinks::SinkInitList{countingSink, fileSink, rotatingSink});
+        novainfra::log::Logger logger(
+            "no-exceptions", novainfra::log::sinks::SinkInitList{countingSink, fileSink, rotatingSink});
         logger.info("message");
         logger.info("value {}", 7);
         logger.flush();
@@ -77,27 +79,42 @@ int main()
     }
 
     {
-        nova::log::setWorker(std::make_shared<nova::log::async::AsyncLogThreadPool>(8, 1));
-        auto asyncLogger = nova::log::factories::AsyncFactory::create<CountingSink>("async-no-exceptions");
+        int callbackCount = 0;
+        auto callbackSink = std::make_shared<novainfra::log::sinks::CallbackSinkSt>(
+            [&callbackCount](const novainfra::log::LogMsg &msg) {
+                if (msg.message == "callback message") {
+                    ++callbackCount;
+                }
+            });
+        novainfra::log::Logger logger("callback-no-exceptions", callbackSink);
+        logger.info("callback message");
+        callbackValid = callbackCount == 1;
+    }
+
+    {
+        novainfra::log::setWorker(std::make_shared<novainfra::log::async::AsyncLogThreadPool>(8, 1));
+        auto asyncLogger =
+            novainfra::log::factories::AsyncFactory::create<CountingSink>("async-no-exceptions");
         auto asyncSink = std::static_pointer_cast<CountingSink>(asyncLogger->sinks().front());
         asyncLogger->info("async message {}", 9);
         asyncLogger->flush();
-        nova::log::shutdown();
+        novainfra::log::shutdown();
         asyncValid = asyncSink->count == 1 && asyncSink->lastMessage == "async message 9";
     }
 
     {
         auto registrySink = std::make_shared<CountingSink>();
-        auto registryLogger = std::make_shared<nova::log::Logger>("registry-no-exceptions", registrySink);
-        nova::log::setDefaultLogger(registryLogger);
-        NOVA_LOG_INFO("registry message {}", 10);
+        auto registryLogger =
+            std::make_shared<novainfra::log::Logger>("registry-no-exceptions", registrySink);
+        novainfra::log::setDefaultLogger(registryLogger);
+        NOVAINFRA_LOG_INFO("registry message {}", 10);
         registryValid = registrySink->count == 1 && registrySink->lastMessage == "registry message 10" &&
-                        nova::log::defaultLogger() == registryLogger;
-        nova::log::shutdown();
+                        novainfra::log::defaultLogger() == registryLogger;
+        novainfra::log::shutdown();
     }
 
-    nova::core::RemoveIfExists(filename);
-    nova::core::RemoveIfExists(rotatingFilename);
-    nova::core::RemoveIfExists(rotatingHistoryFilename);
-    return valid && asyncValid && registryValid ? 0 : 1;
+    novainfra::core::RemoveIfExists(filename);
+    novainfra::core::RemoveIfExists(rotatingFilename);
+    novainfra::core::RemoveIfExists(rotatingHistoryFilename);
+    return valid && asyncValid && callbackValid && registryValid ? 0 : 1;
 }

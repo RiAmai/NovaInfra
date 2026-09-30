@@ -9,7 +9,7 @@
 
 namespace {
 
-constexpr auto kDefaultLogFile = "/tmp/novacore_backtrace_example.log";
+constexpr auto kDefaultLogFile = "/tmp/novainfra_backtrace_example.log";
 
 void printUsage(const char *program)
 {
@@ -32,21 +32,21 @@ int main(int argc, char **argv)
     }
 
     const char *logFile = argc == 3 ? argv[2] : kDefaultLogFile;
-    auto consoleSink = std::make_shared<nova::log::sinks::ConsoleOutSinkMt>();
-    auto fileSink = std::make_shared<nova::log::sinks::BasicFileSinkMt>(logFile, false);
-    auto logger = std::make_shared<nova::log::Logger>(
-        "BacktraceExample", nova::log::sinks::SinkInitList{consoleSink, fileSink});
+    auto consoleSink = std::make_shared<novainfra::log::sinks::ConsoleOutSinkMt>();
+    auto fileSink = std::make_shared<novainfra::log::sinks::BasicFileSinkMt>(logFile, false);
+    auto logger = std::make_shared<novainfra::log::Logger>(
+        "BacktraceExample", novainfra::log::sinks::SinkInitList{consoleSink, fileSink});
 
     logger->enableBacktrace(16);
-    logger->setLevel(nova::log::Level::WARN);
-    logger->setFlushLevel(nova::log::Level::ERROR);
+    logger->setLevel(novainfra::log::Level::WARN);
+    logger->setFlushLevel(novainfra::log::Level::ERROR);
 
     logger->debug("Buffered context: request id {}", 42);
     logger->info("Buffered context: preparing failure demonstration");
     if (mode == "error") {
-        NOVA_LOGGER_ERROR(logger, "Demonstration ERROR triggered");
+        NOVAINFRA_LOGGER_ERROR(logger, "Demonstration ERROR triggered");
     } else {
-        NOVA_LOGGER_CRITICAL(logger, "Demonstration CRITICAL triggered");
+        NOVAINFRA_LOGGER_CRITICAL(logger, "Demonstration CRITICAL triggered");
     }
 
     logger->dumpBacktrace();

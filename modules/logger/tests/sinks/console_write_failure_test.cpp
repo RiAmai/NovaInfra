@@ -11,9 +11,9 @@ int main()
         return 2;
     }
 
-    auto sink = std::make_shared<nova::log::sinks::ConsoleOutSink<std::mutex>>();
-    nova::log::Logger logger("console-failure", sink);
-    logger.setFlushLevel(nova::log::Level::INFO);
+    auto sink = std::make_shared<novainfra::log::sinks::ConsoleOutSink<std::mutex>>();
+    novainfra::log::Logger logger("console-failure", sink);
+    logger.setFlushLevel(novainfra::log::Level::INFO);
     bool errorReported = false;
     logger.setErrHandler([&errorReported](const std::string &) { errorReported = true; });
 

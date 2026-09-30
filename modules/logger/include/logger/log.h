@@ -14,6 +14,7 @@
 #include <logger/registry.h>
 #include <logger/sinks/base_sink.h>
 #include <logger/sinks/basic_file_sink.h>
+#include <logger/sinks/callback_sink.h>
 #include <logger/sinks/console_sink.h>
 #include <logger/sinks/file_event_handlers.h>
 #include <logger/sinks/rotating_file_sink.h>

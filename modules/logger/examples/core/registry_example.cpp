@@ -1,39 +1,39 @@
 #include <logger/sinks/console_sink.h>
-#include <logger/novalog.h>
+#include <logger/log.h>
 
 #include <iostream>
 #include <memory>
 #include <utility>
 
-namespace nova_log = nova::log;
+namespace novainfra_log = novainfra::log;
 
 int main()
 {
-    const auto globalLevel = nova_log::Level::INFO;
-    nova_log::Registry::LogLevels levels{
-        {"Diagnostics", nova_log::Level::TRACE}
+    const auto globalLevel = novainfra_log::Level::INFO;
+    novainfra_log::Registry::LogLevels levels{
+        {"Diagnostics", novainfra_log::Level::TRACE}
     };
-    nova_log::setLevels(std::move(levels), &globalLevel);
-    nova_log::setPattern("[%l] [%n] %v");
+    novainfra_log::setLevels(std::move(levels), &globalLevel);
+    novainfra_log::setPattern("[%l] [%n] %v");
 
-    auto application = nova::log::factories::createConsoleLoggerMt<>("Application");
-    auto diagnostics = nova::log::factories::createConsoleLoggerMt<>("Diagnostics");
-    nova_log::setDefaultLogger(application);
+    auto application = novainfra::log::factories::createConsoleLoggerMt<>("Application");
+    auto diagnostics = novainfra::log::factories::createConsoleLoggerMt<>("Diagnostics");
+    novainfra_log::setDefaultLogger(application);
 
-    NOVA_LOG_DEBUG("This message is filtered by the global INFO level.");
-    NOVA_LOG_INFO("Global macro uses the Application logger.");
+    NOVAINFRA_LOG_DEBUG("This message is filtered by the global INFO level.");
+    NOVAINFRA_LOG_INFO("Global macro uses the Application logger.");
     diagnostics->trace("Name-specific TRACE override is active.");
 
-    const bool registered = nova_log::getNameLogger("Application") == application &&
-                            nova_log::getNameLogger("Diagnostics") == diagnostics &&
-                            nova_log::defaultLogger() == application;
+    const bool registered = novainfra_log::getNameLogger("Application") == application &&
+                            novainfra_log::getNameLogger("Diagnostics") == diagnostics &&
+                            novainfra_log::defaultLogger() == application;
 
-    nova_log::dropLogger("Diagnostics");
-    const bool dropped = nova_log::getNameLogger("Diagnostics") == nullptr;
+    novainfra_log::dropLogger("Diagnostics");
+    const bool dropped = novainfra_log::getNameLogger("Diagnostics") == nullptr;
     std::cout << "registry registered=" << std::boolalpha << registered << " dropped=" << dropped << '\n';
 
-    nova_log::shutdown();
-    const auto resetDefault = nova_log::defaultLogger();
+    novainfra_log::shutdown();
+    const auto resetDefault = novainfra_log::defaultLogger();
     const bool reset = resetDefault && resetDefault->name().empty();
     std::cout << "registry reset=" << reset << '\n';
     return registered && dropped && reset ? 0 : 1;

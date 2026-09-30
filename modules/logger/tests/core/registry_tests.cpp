@@ -2,7 +2,7 @@
 #include <logger/async/async_logger.h>
 #include <logger/sinks/base_sink.h>
 #include <logger/factories/synchronous_factory.h>
-#include <logger/novalog.h>
+#include <logger/log.h>
 
 #include <gtest/gtest.h>
 
@@ -21,7 +21,7 @@ struct RecordedMessage {
     bool hasSource = false;
 };
 
-class ThreadSafeRecordingSink final : public nova::log::sinks::BaseSink<std::mutex>
+class ThreadSafeRecordingSink NOVAINFRA_FINAL : public novainfra::log::sinks::BaseSink<std::mutex>
 {
 public:
     std::vector<RecordedMessage> messages() const
@@ -39,7 +39,7 @@ public:
     int flushCount() const { return flushCount_.load(); }
 
 private:
-    void _log(const nova::log::LogMsg &msg) override
+    void _log(const novainfra::log::LogMsg &msg) NOVAINFRA_OVERRIDE
     {
         std::string formatted;
         formatter_->format(msg, formatted);
@@ -48,7 +48,7 @@ private:
         formattedMessages_.push_back(std::move(formatted));
     }
 
-    void _flush() override { ++flushCount_; }
+    void _flush() NOVAINFRA_OVERRIDE { ++flushCount_; }
 
     mutable std::mutex messagesMutex_;
     std::vector<RecordedMessage> messages_;
@@ -56,35 +56,38 @@ private:
     std::atomic<int> flushCount_{0};
 };
 
-class ThrowingLogSink final : public nova::log::sinks::ISink
+class ThrowingLogSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
-    void log(const nova::log::LogMsg &) override { throw std::runtime_error("registry sink failure"); }
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
-    void flush() override {}
+    void log(const novainfra::log::LogMsg &) NOVAINFRA_OVERRIDE
+    {
+        throw std::runtime_error("registry sink failure");
+    }
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
+    void flush() NOVAINFRA_OVERRIDE {}
 };
 
-class ConstructionCountingSink final : public nova::log::sinks::ISink
+class ConstructionCountingSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
     explicit ConstructionCountingSink(std::atomic<int> &constructionCount) { ++constructionCount; }
 
-    void log(const nova::log::LogMsg &) override {}
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
-    void flush() override {}
+    void log(const novainfra::log::LogMsg &) NOVAINFRA_OVERRIDE {}
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
+    void flush() NOVAINFRA_OVERRIDE {}
 };
 
-class ReentrantFlushSink final : public nova::log::sinks::ISink
+class ReentrantFlushSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
-    void log(const nova::log::LogMsg &) override {}
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
-    void flush() override
+    void log(const novainfra::log::LogMsg &) NOVAINFRA_OVERRIDE {}
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
+    void flush() NOVAINFRA_OVERRIDE
     {
-        observedDefault = static_cast<bool>(nova::log::defaultLogger());
+        observedDefault = static_cast<bool>(novainfra::log::defaultLogger());
         ++flushCount;
     }
 
@@ -92,15 +95,15 @@ public:
     std::atomic<int> flushCount{0};
 };
 
-class WorkerLookupFlushSink final : public nova::log::sinks::ISink
+class WorkerLookupFlushSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
-    void log(const nova::log::LogMsg &) override { ++logCount; }
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
-    void flush() override
+    void log(const novainfra::log::LogMsg &) NOVAINFRA_OVERRIDE { ++logCount; }
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
+    void flush() NOVAINFRA_OVERRIDE
     {
-        observedClearedWorker = !nova::log::worker();
+        observedClearedWorker = !novainfra::log::worker();
         ++flushCount;
     }
 
@@ -109,7 +112,7 @@ public:
     std::atomic<int> flushCount{0};
 };
 
-class ReentrantDestructorLogger final : public nova::log::Logger
+class ReentrantDestructorLogger NOVAINFRA_FINAL : public novainfra::log::Logger
 {
 public:
     ReentrantDestructorLogger(std::string name, std::atomic<bool> &destroyed)
@@ -117,9 +120,9 @@ public:
     {
     }
 
-    ~ReentrantDestructorLogger() override
+    ~ReentrantDestructorLogger() NOVAINFRA_OVERRIDE
     {
-        NOVA_UNUSED(nova::log::defaultLogger());
+        NOVAINFRA_UNUSED(novainfra::log::defaultLogger());
         destroyed_ = true;
     }
 
@@ -130,89 +133,89 @@ private:
 class RegistryTest : public ::testing::Test
 {
 protected:
-    void SetUp() override { nova::log::shutdown(); }
-    void TearDown() override { nova::log::shutdown(); }
+    void SetUp() NOVAINFRA_OVERRIDE { novainfra::log::shutdown(); }
+    void TearDown() NOVAINFRA_OVERRIDE { novainfra::log::shutdown(); }
 };
 
 TEST_F(RegistryTest, DefaultLoggerIsAlwaysAvailableAndCannotBeDropped)
 {
-    auto initial = nova::log::defaultLogger();
+    auto initial = novainfra::log::defaultLogger();
     ASSERT_NE(initial, nullptr);
     EXPECT_EQ(initial->name(), "");
-    EXPECT_EQ(initial->level(), nova::log::Level::INFO);
-    EXPECT_EQ(initial->flushLevel(), nova::log::Level::OFF);
-    EXPECT_EQ(nova::log::getNameLogger(""), initial);
+    EXPECT_EQ(initial->level(), novainfra::log::Level::INFO);
+    EXPECT_EQ(initial->flushLevel(), novainfra::log::Level::OFF);
+    EXPECT_EQ(novainfra::log::getNameLogger(""), initial);
 
-    EXPECT_THROW(nova::log::setDefaultLogger(nullptr), std::invalid_argument);
-    EXPECT_THROW(nova::log::dropLogger(""), std::invalid_argument);
-    EXPECT_THROW(nova::log::registerLogger(nullptr), std::invalid_argument);
-    EXPECT_THROW(nova::log::registerOrReplaceLogger(nullptr), std::invalid_argument);
-    EXPECT_THROW(nova::log::initLogger(nullptr), std::invalid_argument);
-    EXPECT_THROW(nova::log::setFormatter(nullptr), std::invalid_argument);
-    EXPECT_THROW(nova::log::applyAll({}), std::invalid_argument);
+    EXPECT_THROW(novainfra::log::setDefaultLogger(nullptr), std::invalid_argument);
+    EXPECT_THROW(novainfra::log::dropLogger(""), std::invalid_argument);
+    EXPECT_THROW(novainfra::log::registerLogger(nullptr), std::invalid_argument);
+    EXPECT_THROW(novainfra::log::registerOrReplaceLogger(nullptr), std::invalid_argument);
+    EXPECT_THROW(novainfra::log::initLogger(nullptr), std::invalid_argument);
+    EXPECT_THROW(novainfra::log::setFormatter(nullptr), std::invalid_argument);
+    EXPECT_THROW(novainfra::log::applyAll({}), std::invalid_argument);
 
-    nova::log::dropAll();
-    EXPECT_EQ(nova::log::defaultLogger(), initial);
-    EXPECT_EQ(nova::log::getNameLogger(""), initial);
+    novainfra::log::dropAll();
+    EXPECT_EQ(novainfra::log::defaultLogger(), initial);
+    EXPECT_EQ(novainfra::log::getNameLogger(""), initial);
 }
 
 TEST_F(RegistryTest, ReplacementKeepsSnapshotsAndOldNamedLoggerAlive)
 {
-    auto first = std::make_shared<nova::log::Logger>("first");
-    auto second = std::make_shared<nova::log::Logger>("second");
-    nova::log::setDefaultLogger(first);
-    auto snapshot = nova::log::defaultLogger();
+    auto first = std::make_shared<novainfra::log::Logger>("first");
+    auto second = std::make_shared<novainfra::log::Logger>("second");
+    novainfra::log::setDefaultLogger(first);
+    auto snapshot = novainfra::log::defaultLogger();
 
-    nova::log::setDefaultLogger(second);
+    novainfra::log::setDefaultLogger(second);
 
     EXPECT_EQ(snapshot, first);
-    EXPECT_EQ(nova::log::defaultLogger(), second);
-    EXPECT_EQ(nova::log::getNameLogger("first"), first);
-    EXPECT_EQ(nova::log::getNameLogger("second"), second);
+    EXPECT_EQ(novainfra::log::defaultLogger(), second);
+    EXPECT_EQ(novainfra::log::getNameLogger("first"), first);
+    EXPECT_EQ(novainfra::log::getNameLogger("second"), second);
 }
 
 TEST_F(RegistryTest, ReplacingTheDefaultNameKeepsDefaultAndNamedLookupConsistent)
 {
-    auto first = std::make_shared<nova::log::Logger>("same-name");
-    auto replacement = std::make_shared<nova::log::Logger>("same-name");
-    nova::log::setDefaultLogger(first);
+    auto first = std::make_shared<novainfra::log::Logger>("same-name");
+    auto replacement = std::make_shared<novainfra::log::Logger>("same-name");
+    novainfra::log::setDefaultLogger(first);
 
-    nova::log::registerOrReplaceLogger(replacement);
+    novainfra::log::registerOrReplaceLogger(replacement);
 
-    EXPECT_EQ(nova::log::defaultLogger(), replacement);
-    EXPECT_EQ(nova::log::getNameLogger("same-name"), replacement);
+    EXPECT_EQ(novainfra::log::defaultLogger(), replacement);
+    EXPECT_EQ(novainfra::log::getNameLogger("same-name"), replacement);
     EXPECT_NE(first, replacement);
 }
 
 TEST_F(RegistryTest, GlobalConfigurationAppliesToEveryEntryPath)
 {
-    auto &registry = nova::log::Registry::instance();
-    const auto globalLevel = nova::log::Level::WARN;
+    auto &registry = novainfra::log::Registry::instance();
+    const auto globalLevel = novainfra::log::Level::WARN;
     registry.setLevels(
         {
-            {"special", nova::log::Level::DEBUG}
+            {"special", novainfra::log::Level::DEBUG}
     },
         &globalLevel);
-    registry.setFlushLevel(nova::log::Level::ERROR);
-    registry.setFormatter(std::make_unique<nova::log::formatters::PatternFormatter>("%v"));
+    registry.setFlushLevel(novainfra::log::Level::ERROR);
+    registry.setFormatter(std::make_unique<novainfra::log::formatters::PatternFormatter>("%v"));
     registry.enableBacktrace(4);
 
     std::atomic<int> errorCount{0};
     registry.setErrHandler([&](const std::string &) { ++errorCount; });
 
     auto registeredSink = std::make_shared<ThreadSafeRecordingSink>();
-    auto registered = std::make_shared<nova::log::Logger>("special", registeredSink);
+    auto registered = std::make_shared<novainfra::log::Logger>("special", registeredSink);
     registry.registerLogger(registered);
 
     auto defaultSink = std::make_shared<ThrowingLogSink>();
-    auto newDefault = std::make_shared<nova::log::Logger>("configured-default", defaultSink);
+    auto newDefault = std::make_shared<novainfra::log::Logger>("configured-default", defaultSink);
     registry.setDefaultLogger(newDefault);
 
-    EXPECT_EQ(registered->level(), nova::log::Level::DEBUG);
-    EXPECT_EQ(registered->flushLevel(), nova::log::Level::ERROR);
+    EXPECT_EQ(registered->level(), novainfra::log::Level::DEBUG);
+    EXPECT_EQ(registered->flushLevel(), novainfra::log::Level::ERROR);
     EXPECT_TRUE(registered->shouldBacktrace());
-    EXPECT_EQ(newDefault->level(), nova::log::Level::WARN);
-    EXPECT_EQ(newDefault->flushLevel(), nova::log::Level::ERROR);
+    EXPECT_EQ(newDefault->level(), novainfra::log::Level::WARN);
+    EXPECT_EQ(newDefault->flushLevel(), novainfra::log::Level::ERROR);
     EXPECT_TRUE(newDefault->shouldBacktrace());
 
     registered->info("configured");
@@ -224,53 +227,53 @@ TEST_F(RegistryTest, GlobalConfigurationAppliesToEveryEntryPath)
     EXPECT_EQ(errorCount.load(), 1);
 
     registry.setAutoRegistration(false);
-    auto initialized = std::make_shared<nova::log::Logger>("initialized");
+    auto initialized = std::make_shared<novainfra::log::Logger>("initialized");
     registry.initLogger(initialized);
-    EXPECT_EQ(initialized->level(), nova::log::Level::WARN);
+    EXPECT_EQ(initialized->level(), novainfra::log::Level::WARN);
     EXPECT_TRUE(initialized->shouldBacktrace());
     EXPECT_EQ(registry.getNameLogger("initialized"), nullptr);
 }
 
 TEST_F(RegistryTest, GlobalBacktraceControlsExistingAndFutureLoggers)
 {
-    auto existing = std::make_shared<nova::log::Logger>("existing");
-    nova::log::registerLogger(existing);
+    auto existing = std::make_shared<novainfra::log::Logger>("existing");
+    novainfra::log::registerLogger(existing);
 
-    nova::log::enableBacktrace(3);
-    EXPECT_TRUE(nova::log::defaultLogger()->shouldBacktrace());
+    novainfra::log::enableBacktrace(3);
+    EXPECT_TRUE(novainfra::log::defaultLogger()->shouldBacktrace());
     EXPECT_TRUE(existing->shouldBacktrace());
 
-    auto enabledLater = std::make_shared<nova::log::Logger>("enabled-later");
-    nova::log::registerLogger(enabledLater);
+    auto enabledLater = std::make_shared<novainfra::log::Logger>("enabled-later");
+    novainfra::log::registerLogger(enabledLater);
     EXPECT_TRUE(enabledLater->shouldBacktrace());
 
-    nova::log::disableBacktrace();
-    EXPECT_FALSE(nova::log::defaultLogger()->shouldBacktrace());
+    novainfra::log::disableBacktrace();
+    EXPECT_FALSE(novainfra::log::defaultLogger()->shouldBacktrace());
     EXPECT_FALSE(existing->shouldBacktrace());
     EXPECT_FALSE(enabledLater->shouldBacktrace());
 
-    auto disabledLater = std::make_shared<nova::log::Logger>("disabled-later");
+    auto disabledLater = std::make_shared<novainfra::log::Logger>("disabled-later");
     disabledLater->enableBacktrace(2);
-    nova::log::registerLogger(disabledLater);
+    novainfra::log::registerLogger(disabledLater);
     EXPECT_FALSE(disabledLater->shouldBacktrace());
 }
 
 TEST_F(RegistryTest, GlobalDumpBacktraceOnlyDumpsTheDefaultLogger)
 {
-    nova::log::setLevel(nova::log::Level::ERROR);
-    nova::log::setPattern("%v");
+    novainfra::log::setLevel(novainfra::log::Level::ERROR);
+    novainfra::log::setPattern("%v");
 
     auto defaultSink = std::make_shared<ThreadSafeRecordingSink>();
     auto namedSink = std::make_shared<ThreadSafeRecordingSink>();
-    auto defaultLogger = std::make_shared<nova::log::Logger>("default-backtrace", defaultSink);
-    auto namedLogger = std::make_shared<nova::log::Logger>("named-backtrace", namedSink);
-    nova::log::setDefaultLogger(defaultLogger);
-    nova::log::registerLogger(namedLogger);
-    nova::log::enableBacktrace(4);
+    auto defaultLogger = std::make_shared<novainfra::log::Logger>("default-backtrace", defaultSink);
+    auto namedLogger = std::make_shared<novainfra::log::Logger>("named-backtrace", namedSink);
+    novainfra::log::setDefaultLogger(defaultLogger);
+    novainfra::log::registerLogger(namedLogger);
+    novainfra::log::enableBacktrace(4);
 
     defaultLogger->info("default context");
     namedLogger->info("named context");
-    nova::log::dumpBacktrace();
+    novainfra::log::dumpBacktrace();
 
     const auto defaultMessages = defaultSink->messages();
     ASSERT_EQ(defaultMessages.size(), 3U);
@@ -287,23 +290,23 @@ TEST_F(RegistryTest, ConcurrentBacktraceUpdatesAndRegistrationConvergeToLatestCo
 {
     constexpr int kLoggerCount = 64;
     constexpr int kConfigurationUpdates = 100;
-    std::vector<std::shared_ptr<nova::log::Logger>> loggers;
+    std::vector<std::shared_ptr<novainfra::log::Logger>> loggers;
     loggers.reserve(kLoggerCount);
 
     std::thread configurationThread([] {
         for (int index = 0; index < kConfigurationUpdates; ++index) {
             if (index % 2 == 0) {
-                nova::log::enableBacktrace(4);
+                novainfra::log::enableBacktrace(4);
             } else {
-                nova::log::disableBacktrace();
+                novainfra::log::disableBacktrace();
             }
         }
-        nova::log::enableBacktrace(7);
+        novainfra::log::enableBacktrace(7);
     });
     std::thread registrationThread([&] {
         for (int index = 0; index < kLoggerCount; ++index) {
-            auto logger = std::make_shared<nova::log::Logger>("backtrace-" + std::to_string(index));
-            nova::log::registerLogger(logger);
+            auto logger = std::make_shared<novainfra::log::Logger>("backtrace-" + std::to_string(index));
+            novainfra::log::registerLogger(logger);
             loggers.push_back(std::move(logger));
         }
     });
@@ -311,102 +314,102 @@ TEST_F(RegistryTest, ConcurrentBacktraceUpdatesAndRegistrationConvergeToLatestCo
     configurationThread.join();
     registrationThread.join();
 
-    EXPECT_TRUE(nova::log::defaultLogger()->shouldBacktrace());
+    EXPECT_TRUE(novainfra::log::defaultLogger()->shouldBacktrace());
     for (const auto &logger : loggers) {
         EXPECT_TRUE(logger->shouldBacktrace());
     }
 
-    auto registeredAfterUpdates = std::make_shared<nova::log::Logger>("backtrace-after-updates");
-    nova::log::registerLogger(registeredAfterUpdates);
+    auto registeredAfterUpdates = std::make_shared<novainfra::log::Logger>("backtrace-after-updates");
+    novainfra::log::registerLogger(registeredAfterUpdates);
     EXPECT_TRUE(registeredAfterUpdates->shouldBacktrace());
 }
 
 TEST_F(RegistryTest, DropAndShutdownPreserveTheirDocumentedOwnershipRules)
 {
-    auto current = std::make_shared<nova::log::Logger>("current");
-    auto other = std::make_shared<nova::log::Logger>("other");
-    nova::log::setDefaultLogger(current);
-    nova::log::registerLogger(other);
+    auto current = std::make_shared<novainfra::log::Logger>("current");
+    auto other = std::make_shared<novainfra::log::Logger>("other");
+    novainfra::log::setDefaultLogger(current);
+    novainfra::log::registerLogger(other);
 
-    nova::log::dropAll();
-    EXPECT_EQ(nova::log::defaultLogger(), current);
-    EXPECT_EQ(nova::log::getNameLogger("current"), current);
-    EXPECT_EQ(nova::log::getNameLogger("other"), nullptr);
-    EXPECT_EQ(nova::log::getNameLogger(""), nullptr);
+    novainfra::log::dropAll();
+    EXPECT_EQ(novainfra::log::defaultLogger(), current);
+    EXPECT_EQ(novainfra::log::getNameLogger("current"), current);
+    EXPECT_EQ(novainfra::log::getNameLogger("other"), nullptr);
+    EXPECT_EQ(novainfra::log::getNameLogger(""), nullptr);
 
-    nova::log::setLevel(nova::log::Level::TRACE);
-    nova::log::setFlushLevel(nova::log::Level::WARN);
-    nova::log::enableBacktrace(8);
-    nova::log::setAutoRegistration(false);
-    nova::log::setWorker(std::make_shared<nova::log::async::AsyncLogThreadPool>(8, 1));
-    nova::log::shutdown();
+    novainfra::log::setLevel(novainfra::log::Level::TRACE);
+    novainfra::log::setFlushLevel(novainfra::log::Level::WARN);
+    novainfra::log::enableBacktrace(8);
+    novainfra::log::setAutoRegistration(false);
+    novainfra::log::setWorker(std::make_shared<novainfra::log::async::AsyncLogThreadPool>(8, 1));
+    novainfra::log::shutdown();
 
-    auto resetDefault = nova::log::defaultLogger();
+    auto resetDefault = novainfra::log::defaultLogger();
     ASSERT_NE(resetDefault, nullptr);
     EXPECT_NE(resetDefault, current);
     EXPECT_EQ(resetDefault->name(), "");
-    EXPECT_EQ(resetDefault->level(), nova::log::Level::INFO);
-    EXPECT_EQ(resetDefault->flushLevel(), nova::log::Level::OFF);
+    EXPECT_EQ(resetDefault->level(), novainfra::log::Level::INFO);
+    EXPECT_EQ(resetDefault->flushLevel(), novainfra::log::Level::OFF);
     EXPECT_FALSE(resetDefault->shouldBacktrace());
-    EXPECT_EQ(nova::log::worker(), nullptr);
+    EXPECT_EQ(novainfra::log::worker(), nullptr);
 
-    auto afterShutdown = std::make_shared<nova::log::Logger>("after-shutdown");
-    nova::log::initLogger(afterShutdown);
+    auto afterShutdown = std::make_shared<novainfra::log::Logger>("after-shutdown");
+    novainfra::log::initLogger(afterShutdown);
     EXPECT_FALSE(afterShutdown->shouldBacktrace());
-    EXPECT_EQ(nova::log::getNameLogger("after-shutdown"), afterShutdown);
+    EXPECT_EQ(novainfra::log::getNameLogger("after-shutdown"), afterShutdown);
 }
 
 TEST_F(RegistryTest, AsyncFactoryRequiresAConfiguredWorkerBeforeConstructingTheSink)
 {
     std::atomic<int> constructionCount{0};
 
-    EXPECT_THROW(nova::log::factories::AsyncFactory::create<ConstructionCountingSink>(
+    EXPECT_THROW(novainfra::log::factories::AsyncFactory::create<ConstructionCountingSink>(
                      "async-factory-without-worker", constructionCount),
                  std::runtime_error);
     EXPECT_EQ(constructionCount.load(), 0);
-    EXPECT_EQ(nova::log::getNameLogger("async-factory-without-worker"), nullptr);
+    EXPECT_EQ(novainfra::log::getNameLogger("async-factory-without-worker"), nullptr);
 }
 
 TEST_F(RegistryTest, AsyncFactoryUsesRegistryWorkerConfigurationAndRegistration)
 {
-    nova::log::setLevel(nova::log::Level::TRACE);
-    nova::log::setPattern("%v");
-    nova::log::setWorker(std::make_shared<nova::log::async::AsyncLogThreadPool>(8, 1));
+    novainfra::log::setLevel(novainfra::log::Level::TRACE);
+    novainfra::log::setPattern("%v");
+    novainfra::log::setWorker(std::make_shared<novainfra::log::async::AsyncLogThreadPool>(8, 1));
 
-    auto logger = nova::log::factories::AsyncFactory::create<ThreadSafeRecordingSink>("async-factory");
-    auto asyncLogger = std::dynamic_pointer_cast<nova::log::async::AsyncLogger>(logger);
+    auto logger = novainfra::log::factories::AsyncFactory::create<ThreadSafeRecordingSink>("async-factory");
+    auto asyncLogger = std::dynamic_pointer_cast<novainfra::log::async::AsyncLogger>(logger);
     auto sink = std::static_pointer_cast<ThreadSafeRecordingSink>(logger->sinks().front());
 
     ASSERT_NE(asyncLogger, nullptr);
-    EXPECT_EQ(nova::log::getNameLogger("async-factory"), logger);
-    EXPECT_EQ(logger->level(), nova::log::Level::TRACE);
+    EXPECT_EQ(novainfra::log::getNameLogger("async-factory"), logger);
+    EXPECT_EQ(logger->level(), novainfra::log::Level::TRACE);
 
     logger->debug("factory {}", "message");
-    nova::log::shutdown();
+    novainfra::log::shutdown();
 
     const auto messages = sink->messages();
     ASSERT_EQ(messages.size(), 1U);
     EXPECT_EQ(messages.front().message, "factory message");
     ASSERT_EQ(sink->formattedMessages().size(), 1U);
     EXPECT_EQ(sink->formattedMessages().front(), "factory message\n");
-    EXPECT_EQ(nova::log::worker(), nullptr);
+    EXPECT_EQ(novainfra::log::worker(), nullptr);
 }
 
 TEST_F(RegistryTest, GlobalFunctionsAndMacrosUseTheCurrentDefaultSnapshot)
 {
-    nova::log::setLevel(nova::log::Level::TRACE);
-    nova::log::setPattern("%v");
+    novainfra::log::setLevel(novainfra::log::Level::TRACE);
+    novainfra::log::setPattern("%v");
     auto sink = std::make_shared<ThreadSafeRecordingSink>();
-    auto logger = std::make_shared<nova::log::Logger>("global", sink);
-    nova::log::setDefaultLogger(logger);
+    auto logger = std::make_shared<novainfra::log::Logger>("global", sink);
+    novainfra::log::setDefaultLogger(logger);
 
-    NOVA_LOG_TRACE("trace {}", 1);
-    NOVA_LOG_DEBUG("debug {}", 2);
-    NOVA_LOG_INFO("info {}", 3);
-    NOVA_LOG_WARN("warn {}", 4);
-    NOVA_LOG_ERROR("error {}", 5);
-    NOVA_LOG_CRITICAL("critical {}", 6);
-    nova::log::info("plain braces {} stay literal");
+    NOVAINFRA_LOG_TRACE("trace {}", 1);
+    NOVAINFRA_LOG_DEBUG("debug {}", 2);
+    NOVAINFRA_LOG_INFO("info {}", 3);
+    NOVAINFRA_LOG_WARN("warn {}", 4);
+    NOVAINFRA_LOG_ERROR("error {}", 5);
+    NOVAINFRA_LOG_CRITICAL("critical {}", 6);
+    novainfra::log::info("plain braces {} stay literal");
 
     const auto messages = sink->messages();
     ASSERT_EQ(messages.size(), 7U);
@@ -420,38 +423,38 @@ TEST_F(RegistryTest, GlobalFunctionsAndMacrosUseTheCurrentDefaultSnapshot)
 TEST_F(RegistryTest, RegistryDoesNotHoldItsMutexAcrossCallbacksFlushOrDestruction)
 {
     std::atomic<int> callbacks{0};
-    nova::log::applyAll([&](std::shared_ptr<nova::log::Logger>) {
-        EXPECT_NE(nova::log::defaultLogger(), nullptr);
+    novainfra::log::applyAll([&](std::shared_ptr<novainfra::log::Logger>) {
+        EXPECT_NE(novainfra::log::defaultLogger(), nullptr);
         ++callbacks;
     });
     EXPECT_GT(callbacks.load(), 0);
 
     auto flushSink = std::make_shared<ReentrantFlushSink>();
-    nova::log::registerLogger(std::make_shared<nova::log::Logger>("reentrant-flush", flushSink));
-    nova::log::flushAll();
+    novainfra::log::registerLogger(std::make_shared<novainfra::log::Logger>("reentrant-flush", flushSink));
+    novainfra::log::flushAll();
     EXPECT_TRUE(flushSink->observedDefault.load());
     EXPECT_EQ(flushSink->flushCount.load(), 1);
 
     std::atomic<bool> destroyed{false};
     auto reentrant = std::make_shared<ReentrantDestructorLogger>("reentrant-destructor", destroyed);
-    nova::log::registerLogger(reentrant);
+    novainfra::log::registerLogger(reentrant);
     reentrant.reset();
-    nova::log::dropLogger("reentrant-destructor");
+    novainfra::log::dropLogger("reentrant-destructor");
     EXPECT_TRUE(destroyed.load());
 }
 
 TEST_F(RegistryTest, ShutdownJoinsWorkerWithoutHoldingRegistryMutex)
 {
     auto sink = std::make_shared<WorkerLookupFlushSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(8, 1);
-    nova::log::setWorker(worker);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>("registry-async", sink, worker);
-    nova::log::registerLogger(logger);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(8, 1);
+    novainfra::log::setWorker(worker);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("registry-async", sink, worker);
+    novainfra::log::registerLogger(logger);
     logger->info("queued");
 
     logger.reset();
     worker.reset();
-    nova::log::shutdown();
+    novainfra::log::shutdown();
 
     EXPECT_EQ(sink->logCount.load(), 1);
     EXPECT_GE(sink->flushCount.load(), 1);
@@ -460,12 +463,12 @@ TEST_F(RegistryTest, ShutdownJoinsWorkerWithoutHoldingRegistryMutex)
 
 TEST_F(RegistryTest, ConcurrentDefaultReplacementAndGlobalLoggingKeepEveryCallAlive)
 {
-    nova::log::setLevel(nova::log::Level::INFO);
+    novainfra::log::setLevel(novainfra::log::Level::INFO);
     auto firstSink = std::make_shared<ThreadSafeRecordingSink>();
     auto secondSink = std::make_shared<ThreadSafeRecordingSink>();
-    auto first = std::make_shared<nova::log::Logger>("concurrent-default", firstSink);
-    auto second = std::make_shared<nova::log::Logger>("concurrent-default", secondSink);
-    nova::log::setDefaultLogger(first);
+    auto first = std::make_shared<novainfra::log::Logger>("concurrent-default", firstSink);
+    auto second = std::make_shared<novainfra::log::Logger>("concurrent-default", secondSink);
+    novainfra::log::setDefaultLogger(first);
 
     constexpr int kLogThreads = 4;
     constexpr int kLogsPerThread = 1000;
@@ -473,13 +476,13 @@ TEST_F(RegistryTest, ConcurrentDefaultReplacementAndGlobalLoggingKeepEveryCallAl
     std::vector<std::thread> threads;
     threads.emplace_back([&] {
         for (int i = 0; i < kReplacements; ++i) {
-            nova::log::setDefaultLogger((i % 2 == 0) ? first : second);
+            novainfra::log::setDefaultLogger((i % 2 == 0) ? first : second);
         }
     });
     for (int threadIndex = 0; threadIndex < kLogThreads; ++threadIndex) {
         threads.emplace_back([] {
             for (int i = 0; i < kLogsPerThread; ++i) {
-                NOVA_LOG_INFO("concurrent {}", i);
+                NOVAINFRA_LOG_INFO("concurrent {}", i);
             }
         });
     }
@@ -489,17 +492,17 @@ TEST_F(RegistryTest, ConcurrentDefaultReplacementAndGlobalLoggingKeepEveryCallAl
 
     const auto totalMessages = firstSink->messages().size() + secondSink->messages().size();
     EXPECT_EQ(totalMessages, static_cast<std::size_t>(kLogThreads * kLogsPerThread));
-    EXPECT_NE(nova::log::defaultLogger(), nullptr);
+    EXPECT_NE(novainfra::log::defaultLogger(), nullptr);
 }
 
 TEST_F(RegistryTest, ErrorHandlerCanBeReplacedWhileOtherThreadsReportFailures)
 {
     auto logger =
-        std::make_shared<nova::log::Logger>("concurrent-errors", std::make_shared<ThrowingLogSink>());
-    nova::log::setDefaultLogger(logger);
+        std::make_shared<novainfra::log::Logger>("concurrent-errors", std::make_shared<ThrowingLogSink>());
+    novainfra::log::setDefaultLogger(logger);
     std::atomic<int> firstHandlerCount{0};
     std::atomic<int> secondHandlerCount{0};
-    nova::log::setErrHandler([&](const std::string &) { ++firstHandlerCount; });
+    novainfra::log::setErrHandler([&](const std::string &) { ++firstHandlerCount; });
 
     constexpr int kFailures = 2000;
     std::thread loggerThread([&] {
@@ -510,9 +513,9 @@ TEST_F(RegistryTest, ErrorHandlerCanBeReplacedWhileOtherThreadsReportFailures)
     std::thread configurationThread([&] {
         for (int i = 0; i < kFailures; ++i) {
             if (i % 2 == 0) {
-                nova::log::setErrHandler([&](const std::string &) { ++firstHandlerCount; });
+                novainfra::log::setErrHandler([&](const std::string &) { ++firstHandlerCount; });
             } else {
-                nova::log::setErrHandler([&](const std::string &) { ++secondHandlerCount; });
+                novainfra::log::setErrHandler([&](const std::string &) { ++secondHandlerCount; });
             }
         }
     });

@@ -1,6 +1,6 @@
 #include <logger/factories/async_factory.h>
 #include <logger/sinks/base_sink.h>
-#include <logger/novalog.h>
+#include <logger/log.h>
 
 #include <atomic>
 #include <chrono>
@@ -12,23 +12,23 @@
 #include <string>
 #include <thread>
 
-namespace nova_log = nova::log;
+namespace novainfra_log = novainfra::log;
 
 namespace {
 
-class SlowSink final : public nova::log::sinks::BaseSink<std::mutex>
+class SlowSink NOVAINFRA_FINAL : public novainfra::log::sinks::BaseSink<std::mutex>
 {
 public:
     std::size_t processed() const { return processed_.load(); }
 
 private:
-    void _log(const nova_log::LogMsg &) override
+    void _log(const novainfra_log::LogMsg &) NOVAINFRA_OVERRIDE
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
         ++processed_;
     }
 
-    void _flush() override {}
+    void _flush() NOVAINFRA_OVERRIDE {}
 
     std::atomic<std::size_t> processed_{0};
 };
@@ -42,9 +42,9 @@ struct PolicyStats {
 template <typename Factory>
 PolicyStats runPolicy(const std::string &name, std::size_t messageCount)
 {
-    nova_log::shutdown();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(4, 1);
-    nova_log::setWorker(worker);
+    novainfra_log::shutdown();
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(4, 1);
+    novainfra_log::setWorker(worker);
     auto logger = Factory::template create<SlowSink>(name);
     auto sink = std::static_pointer_cast<SlowSink>(logger->sinks().front());
 
@@ -53,7 +53,7 @@ PolicyStats runPolicy(const std::string &name, std::size_t messageCount)
     }
 
     PolicyStats stats{0, worker->overrunCounter(), worker->discardCounter()};
-    nova_log::shutdown();
+    novainfra_log::shutdown();
     worker.reset();
     stats.processed = sink->processed();
     return stats;
@@ -70,10 +70,11 @@ void printStats(const char *name, const PolicyStats &stats)
 int main()
 {
     constexpr std::size_t kMessageCount = 256;
-    const auto blocking = runPolicy<nova::log::factories::AsyncFactory>("Blocking", kMessageCount);
+    const auto blocking = runPolicy<novainfra::log::factories::AsyncFactory>("Blocking", kMessageCount);
     const auto overrun =
-        runPolicy<nova::log::factories::AsyncOverrunOldestFactory>("OverrunOldest", kMessageCount);
-    const auto discard = runPolicy<nova::log::factories::AsyncDiscardNewFactory>("DiscardNew", kMessageCount);
+        runPolicy<novainfra::log::factories::AsyncOverrunOldestFactory>("OverrunOldest", kMessageCount);
+    const auto discard =
+        runPolicy<novainfra::log::factories::AsyncDiscardNewFactory>("DiscardNew", kMessageCount);
 
     printStats("BLOCK", blocking);
     printStats("OVER_RUN_OLDEST", overrun);

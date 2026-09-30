@@ -1,15 +1,15 @@
 # Third-Party Notices
 
-NovaCore includes or derives portions of the following third-party software.
+NovaInfra includes or derives portions of the following third-party software.
 
 ## spdlog
 
-The queue and operating-system helper implementations in NovaCore contain
+The queue and operating-system helper implementations in NovaInfra contain
 code derived from spdlog (https://github.com/gabime/spdlog).
 
 Derived source mapping:
 
-| NovaCore file | Upstream spdlog source |
+| NovaInfra file | Upstream spdlog source |
 |---|---|
 | `modules/core/include/core/circular_queue.h` | `include/spdlog/details/circular_q.h` |
 | `modules/core/include/core/mpmc_blocking_queue.h` | `include/spdlog/details/mpmc_blocking_q.h` |
@@ -40,9 +40,20 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
+## Boost.SML 1.2.0
+
+NovaInfra StateMachine vendors the single-header Boost.SML implementation from
+https://github.com/boost-ext/sml (version 1.2.0, commit
+`2074a7e826816c140f0b192529f4ac6556f7fad1`, `include/boost/sml.hpp`).
+
+Copyright (c) 2016-2024 Kris Jusiak.
+
+Distributed under the Boost Software License, Version 1.0:
+https://www.boost.org/LICENSE_1_0.txt
+
 ## fmt 12.2.0
 
-Nova Logger bundles the fmt C++ headers in header-only mode
+NovaInfra Logger bundles the fmt C++ headers in header-only mode
 (https://github.com/fmtlib/fmt).
 
 Copyright (c) 2012 - present, Victor Zverovich and {fmt} contributors
@@ -65,3 +76,13 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## toml++ 3.4.0
+
+NovaInfra Config uses the single-header toml++ parser at build time
+(https://github.com/marzer/tomlplusplus), pinned to version 3.4.0.
+
+Copyright (c) 2021-2024 Mark Gillard.
+
+Distributed under the MIT License:
+https://github.com/marzer/tomlplusplus/blob/v3.4.0/LICENSE

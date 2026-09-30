@@ -9,7 +9,7 @@
 #include <string>
 #include <utility>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::factories {
 
 template <async::AsyncOverflowPolicy OverflowPolicy = async::AsyncOverflowPolicy::BLOCK>
@@ -24,7 +24,7 @@ struct AsynchronousFactory {
     {
         auto worker = Registry::instance().worker();
         if (!worker) {
-            NOVA_THROW(std::runtime_error("Async logger worker is not configured"));
+            NOVAINFRA_THROW(std::runtime_error("Async logger worker is not configured"));
         }
 
         auto sink = std::make_shared<Sink>(std::forward<SinkArgs>(args)...);
@@ -58,4 +58,4 @@ inline std::shared_ptr<Logger> createAsyncDN(std::string loggerName, SinkArgs &&
 }
 
 }  // namespace log::factories
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

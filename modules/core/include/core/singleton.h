@@ -23,5 +23,5 @@ protected:
     Singleton() = default;
     virtual ~Singleton() = default;
 
-    NOVA_DISABLE_COPY(Singleton)
+    NOVAINFRA_DISABLE_COPY(Singleton)
 };

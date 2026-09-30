@@ -5,7 +5,7 @@
 #include <logger/sinks/base_sink.h>
 #include <logger/sinks/file_event_handlers.h>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::sinks {
 
 // basic file sink
@@ -31,11 +31,11 @@ public:
     }
 
 protected:
-    void _log(const details::LogMsg &msg) final override
+    void _log(const details::LogMsg &msg) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
         fileAssistant_.write(BaseSink<Mutex>::formatMessage(msg));
     }
-    void _flush() final override { fileAssistant_.flush(); }
+    void _flush() NOVAINFRA_FINAL NOVAINFRA_OVERRIDE { fileAssistant_.flush(); }
 
 private:
     details::FileAssistant fileAssistant_;
@@ -45,4 +45,4 @@ using BasicFileSinkMt = BasicFileSink<std::mutex>;
 using BasicFileSinkSt = BasicFileSink<details::NullMutex>;
 
 }  // namespace log::sinks
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

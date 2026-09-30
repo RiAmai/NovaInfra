@@ -11,10 +11,10 @@
 #include <initializer_list>
 #include <memory>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::sinks {
 
-class NOVA_LIB_PORT ISink
+class NOVAINFRA_LIB_PORT ISink
 {
 public:
     virtual ~ISink() = default;
@@ -28,7 +28,7 @@ public:
     // Return true only when log(), flush(), and concurrent configuration access
     // are safe. Async pools with multiple workers require this capability;
     // custom sinks must opt in explicitly.
-    virtual bool isThreadSafe() const noexcept { return false; }
+    virtual bool isThreadSafe() const NOVAINFRA_NOEXCEPT { return false; }
 
     void setLevel(Level level) { level_.store(level); }
     Level level() const { return static_cast<Level>(level_.load(std::memory_order_relaxed)); }
@@ -42,4 +42,4 @@ using SinkPtr = std::shared_ptr<ISink>;
 using SinkInitList = std::initializer_list<SinkPtr>;
 
 }  // namespace log::sinks
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

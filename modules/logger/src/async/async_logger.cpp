@@ -4,7 +4,7 @@
 #include <exception>
 #include <stdexcept>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::async {
 
 AsyncOverflowPolicy AsyncLogger::validateOverflowPolicy(AsyncOverflowPolicy policy)
@@ -15,7 +15,7 @@ AsyncOverflowPolicy AsyncLogger::validateOverflowPolicy(AsyncOverflowPolicy poli
         case AsyncOverflowPolicy::DISCARD_NEW:
             return policy;
     }
-    NOVA_THROW(std::invalid_argument("Invalid async overflow policy"));
+    NOVAINFRA_THROW(std::invalid_argument("Invalid async overflow policy"));
     return AsyncOverflowPolicy::BLOCK;
 }
 
@@ -39,7 +39,7 @@ AsyncLogger::AsyncLogger(const AsyncLogger &other)
     validateThreadSafeSinks();
 }
 
-AsyncLogger::~AsyncLogger() noexcept
+AsyncLogger::~AsyncLogger() NOVAINFRA_NOEXCEPT
 {
     backendFlushNoexcept();
 }
@@ -53,7 +53,7 @@ std::shared_ptr<Logger> AsyncLogger::clone(std::string name)
 
 void AsyncLogger::sinkIt(const details::LogMsg &msg)
 {
-    NOVA_TRY
+    NOVAINFRA_TRY
     {
         auto self = weak_from_this().lock();
         if (!self) {
@@ -66,12 +66,12 @@ void AsyncLogger::sinkIt(const details::LogMsg &msg)
         }
         errHandler("async log: worker thread doesn't exist anymore");
     }
-    NOVA_LOG_DETAILS_CATCH(msg.source)
+    NOVAINFRA_LOG_DETAILS_CATCH(msg.source)
 }
 
 void AsyncLogger::_flush()
 {
-    NOVA_TRY
+    NOVAINFRA_TRY
     {
         auto self = weak_from_this().lock();
         if (!self) {
@@ -84,7 +84,7 @@ void AsyncLogger::_flush()
         }
         errHandler("async flush: worker thread doesn't exist anymore");
     }
-    NOVA_LOG_DETAILS_CATCH(SourceLocation())
+    NOVAINFRA_LOG_DETAILS_CATCH(SourceLocation())
 }
 
 void AsyncLogger::backendSinkIt(const details::LogMsg &incomingLogMsg)
@@ -95,14 +95,13 @@ void AsyncLogger::backendSinkIt(const details::LogMsg &incomingLogMsg)
             continue;
         }
         if (sink->shouldLog(incomingLogMsg.level)) {
-            NOVA_TRY
+            NOVAINFRA_TRY
             {
                 sink->log(incomingLogMsg);
             }
-            NOVA_LOG_DETAILS_CATCH(incomingLogMsg.source)
+            NOVAINFRA_LOG_DETAILS_CATCH(incomingLogMsg.source)
         }
     }
-
 }
 
 void AsyncLogger::validateThreadSafeSinks() const
@@ -116,7 +115,7 @@ void AsyncLogger::validateThreadSafeSinks() const
     for (std::size_t sinkIndex = 0; sinkIndex < sinks_.size(); ++sinkIndex) {
         const auto &sink = sinks_[sinkIndex];
         if (sink && !sink->isThreadSafe()) {
-            NOVA_THROW(std::invalid_argument(
+            NOVAINFRA_THROW(std::invalid_argument(
                 "AsyncLogger '" + name_ + "' cannot use sink[" + std::to_string(sinkIndex) + "] with " +
                 std::to_string(workerCount) + " workers: use a thread-safe sink or configure one worker"));
         }
@@ -130,27 +129,25 @@ void AsyncLogger::backendFlush()
             errHandler("Logger sink is null");
             continue;
         }
-        NOVA_TRY
+        NOVAINFRA_TRY
         {
             sink->flush();
         }
-        NOVA_LOG_DETAILS_CATCH(SourceLocation())
+        NOVAINFRA_LOG_DETAILS_CATCH(SourceLocation())
     }
 }
 
-void AsyncLogger::backendFlushNoexcept() noexcept
+void AsyncLogger::backendFlushNoexcept() NOVAINFRA_NOEXCEPT
 {
-    NOVA_TRY
+    NOVAINFRA_TRY
     {
         backendFlush();
     }
-    NOVA_CATCH_STD_BODY({
-        std::fprintf(stderr, "[*** ASYNC LOG ERROR ***] final flush failed: %s\n", ex.what());
-    })
-    NOVA_CATCH_ALL_BODY({
-        std::fputs("[*** ASYNC LOG ERROR ***] final flush failed with an unknown exception\n", stderr);
-    })
+    NOVAINFRA_CATCH_STD_BODY(
+        { std::fprintf(stderr, "[*** ASYNC LOG ERROR ***] final flush failed: %s\n", ex.what()); })
+    NOVAINFRA_CATCH_ALL_BODY(
+        { std::fputs("[*** ASYNC LOG ERROR ***] final flush failed with an unknown exception\n", stderr); })
 }
 
 }  // namespace log::async
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

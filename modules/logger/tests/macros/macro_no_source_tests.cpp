@@ -1,6 +1,6 @@
 #include <logger/logger.h>
 #include <logger/macros.h>
-#include <logger/novalog.h>
+#include <logger/log.h>
 
 #include <gtest/gtest.h>
 
@@ -8,23 +8,23 @@
 
 namespace {
 
-class SourceSink final : public nova::log::sinks::ISink
+class SourceSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
-    void log(const nova::log::LogMsg &msg) override { source = msg.source; }
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
-    void flush() override {}
+    void log(const novainfra::log::LogMsg &msg) NOVAINFRA_OVERRIDE { source = msg.source; }
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
+    void flush() NOVAINFRA_OVERRIDE {}
 
-    nova::log::SourceLocation source{};
+    novainfra::log::SourceLocation source{};
 };
 
 TEST(LoggerMacros, NoSourceLocationPassesEmptySource)
 {
     auto sink = std::make_shared<SourceSink>();
-    auto logger = std::make_shared<nova::log::Logger>("no-source", sink);
+    auto logger = std::make_shared<novainfra::log::Logger>("no-source", sink);
 
-    NOVA_LOGGER_INFO(logger, "message");
+    NOVAINFRA_LOGGER_INFO(logger, "message");
 
     EXPECT_TRUE(sink->source.file.empty());
     EXPECT_EQ(sink->source.line, 0);
@@ -34,15 +34,15 @@ TEST(LoggerMacros, NoSourceLocationPassesEmptySource)
 TEST(LoggerMacros, GlobalMacroHonorsNoSourceLocation)
 {
     auto sink = std::make_shared<SourceSink>();
-    auto logger = std::make_shared<nova::log::Logger>("global-no-source", sink);
-    nova::log::setDefaultLogger(logger);
+    auto logger = std::make_shared<novainfra::log::Logger>("global-no-source", sink);
+    novainfra::log::setDefaultLogger(logger);
 
-    NOVA_LOG_INFO("message");
+    NOVAINFRA_LOG_INFO("message");
 
     EXPECT_TRUE(sink->source.file.empty());
     EXPECT_EQ(sink->source.line, 0);
     EXPECT_TRUE(sink->source.function.empty());
-    nova::log::shutdown();
+    novainfra::log::shutdown();
 }
 
 }  // namespace

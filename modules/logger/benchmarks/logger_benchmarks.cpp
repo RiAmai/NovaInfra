@@ -2,7 +2,7 @@
 #include <logger/async/async_logger.h>
 #include <logger/formatters/pattern_formatter.h>
 #include <logger/logger.h>
-#include <logger/novalog.h>
+#include <logger/log.h>
 #include <logger/sinks/sink.h>
 
 #include <algorithm>
@@ -12,7 +12,9 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -21,24 +23,24 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
-constexpr std::size_t kMeasuredSamples = 7;
+constexpr std::size_t kMeasuredSamples = 11;
 constexpr std::size_t kAsyncQueueCapacity = 8192;
 constexpr std::size_t kAsyncLoggerCount = 64;
 
-class CountingSink final : public nova::log::sinks::ISink
+class CountingSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
-    void log(const nova::log::LogMsg &) override { ++count_; }
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
-    void flush() override {}
+    void log(const novainfra::log::LogMsg &) NOVAINFRA_OVERRIDE { ++count_; }
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
+    void flush() NOVAINFRA_OVERRIDE {}
 
-    bool isThreadSafe() const noexcept override { return true; }
+    bool isThreadSafe() const noexcept NOVAINFRA_OVERRIDE { return true; }
 
-    nova::Uint64 count() const { return count_.load(std::memory_order_relaxed); }
+    novainfra::Uint64 count() const { return count_.load(std::memory_order_relaxed); }
 
 private:
-    std::atomic<nova::Uint64> count_{0};
+    std::atomic<novainfra::Uint64> count_{0};
 };
 
 double ElapsedSeconds(Clock::time_point start)
@@ -46,51 +48,58 @@ double ElapsedSeconds(Clock::time_point start)
     return std::chrono::duration<double>(Clock::now() - start).count();
 }
 
-double Median(std::vector<double> samples)
+struct SampleSummary {
+    double median;
+    double p95;
+};
+
+SampleSummary Summarize(std::vector<double> samples)
 {
     std::sort(samples.begin(), samples.end());
-    return samples[samples.size() / 2];
+    const auto p95Index = (samples.size() * 95 + 99) / 100 - 1;
+    return {samples[samples.size() / 2], samples[std::min(p95Index, samples.size() - 1)]};
 }
 
-void PrintResult(const std::string &name, nova::Uint64 operations, double medianSeconds)
+void PrintResult(const std::string &name, novainfra::Uint64 operations, const SampleSummary &summary)
 {
-    const auto nsPerOperation = medianSeconds * 1'000'000'000.0 / static_cast<double>(operations);
-    const auto millionPerSecond = static_cast<double>(operations) / medianSeconds / 1'000'000.0;
+    const auto medianNs = summary.median * 1'000'000'000.0 / static_cast<double>(operations);
+    const auto p95Ns = summary.p95 * 1'000'000'000.0 / static_cast<double>(operations);
+    const auto millionPerSecond = static_cast<double>(operations) / summary.median / 1'000'000.0;
     std::cerr << std::left << std::setw(34) << name << std::right << std::fixed << std::setprecision(2)
-              << std::setw(12) << nsPerOperation << " ns/op" << std::setw(12) << millionPerSecond
-              << " Mops/s\n";
+              << std::setw(12) << medianNs << " ns/op" << std::setw(12) << p95Ns << " p95" << std::setw(12)
+              << millionPerSecond << " Mops/s\n";
 }
 
 template <typename Function>
-void RunBenchmark(const std::string &name, nova::Uint64 operations, Function &&function)
+void RunBenchmark(const std::string &name, novainfra::Uint64 operations, Function &&function)
 {
-    function(std::max<nova::Uint64>(operations / 20, 1));
+    function(std::max<novainfra::Uint64>(operations / 20, 1));
 
     std::vector<double> samples;
     samples.reserve(kMeasuredSamples);
     for (std::size_t sample = 0; sample < kMeasuredSamples; ++sample) {
         samples.push_back(function(operations));
     }
-    PrintResult(name, operations, Median(std::move(samples)));
+    PrintResult(name, operations, Summarize(std::move(samples)));
 }
 
-double BenchmarkFiltered(nova::Uint64 operations)
+double BenchmarkFiltered(novainfra::Uint64 operations)
 {
-    nova::log::Logger logger("filtered");
-    logger.setLevel(nova::log::Level::OFF);
+    novainfra::log::Logger logger("filtered");
+    logger.setLevel(novainfra::log::Level::OFF);
     const auto start = Clock::now();
-    for (nova::Uint64 index = 0; index < operations; ++index) {
+    for (novainfra::Uint64 index = 0; index < operations; ++index) {
         logger.info("value {}", index);
     }
     return ElapsedSeconds(start);
 }
 
-double BenchmarkSynchronousLiteral(nova::Uint64 operations)
+double BenchmarkSynchronousLiteral(novainfra::Uint64 operations)
 {
     auto sink = std::make_shared<CountingSink>();
-    nova::log::Logger logger("sync-literal", sink);
+    novainfra::log::Logger logger("sync-literal", sink);
     const auto start = Clock::now();
-    for (nova::Uint64 index = 0; index < operations; ++index) {
+    for (novainfra::Uint64 index = 0; index < operations; ++index) {
         logger.info("short literal message");
     }
     const auto elapsed = ElapsedSeconds(start);
@@ -100,12 +109,12 @@ double BenchmarkSynchronousLiteral(nova::Uint64 operations)
     return elapsed;
 }
 
-double BenchmarkSynchronousFormatted(nova::Uint64 operations)
+double BenchmarkSynchronousFormatted(novainfra::Uint64 operations)
 {
     auto sink = std::make_shared<CountingSink>();
-    nova::log::Logger logger("sync-formatted", sink);
+    novainfra::log::Logger logger("sync-formatted", sink);
     const auto start = Clock::now();
-    for (nova::Uint64 index = 0; index < operations; ++index) {
+    for (novainfra::Uint64 index = 0; index < operations; ++index) {
         logger.info("value {}", index);
     }
     const auto elapsed = ElapsedSeconds(start);
@@ -115,12 +124,12 @@ double BenchmarkSynchronousFormatted(nova::Uint64 operations)
     return elapsed;
 }
 
-double BenchmarkSynchronousLong(nova::Uint64 operations)
+double BenchmarkSynchronousLong(novainfra::Uint64 operations)
 {
     auto sink = std::make_shared<CountingSink>();
-    nova::log::Logger logger("sync-long", sink);
+    novainfra::log::Logger logger("sync-long", sink);
     const auto start = Clock::now();
-    for (nova::Uint64 index = 0; index < operations; ++index) {
+    for (novainfra::Uint64 index = 0; index < operations; ++index) {
         logger.info("value {:0240}", index);
     }
     const auto elapsed = ElapsedSeconds(start);
@@ -130,15 +139,14 @@ double BenchmarkSynchronousLong(nova::Uint64 operations)
     return elapsed;
 }
 
-double BenchmarkGlobalLiteral(nova::Uint64 operations)
+double BenchmarkSynchronousMessage(novainfra::Uint64 operations, std::size_t messageSize)
 {
     auto sink = std::make_shared<CountingSink>();
-    auto logger = std::make_shared<nova::log::Logger>("benchmark-global", sink);
-    nova::log::setDefaultLogger(logger);
-
+    novainfra::log::Logger logger("sync-message", sink);
+    const std::string message(messageSize, 'x');
     const auto start = Clock::now();
-    for (nova::Uint64 index = 0; index < operations; ++index) {
-        nova::log::info("short literal message");
+    for (novainfra::Uint64 index = 0; index < operations; ++index) {
+        logger.info(std::string_view(message));
     }
     const auto elapsed = ElapsedSeconds(start);
     if (sink->count() != operations) {
@@ -147,14 +155,69 @@ double BenchmarkGlobalLiteral(nova::Uint64 operations)
     return elapsed;
 }
 
-double BenchmarkPatternFormatter(nova::Uint64 operations, const std::string &pattern)
+double BenchmarkGlobalLiteral(novainfra::Uint64 operations)
 {
-    nova::log::formatters::PatternFormatter formatter(pattern);
-    nova::log::LogMsg message{nova::core::Now(), nova::log::Level::INFO, nova::core::ThreadId(), {},
-                              "benchmark",       "short literal message"};
+    auto sink = std::make_shared<CountingSink>();
+    auto logger = std::make_shared<novainfra::log::Logger>("benchmark-global", sink);
+    novainfra::log::setDefaultLogger(logger);
+
+    const auto start = Clock::now();
+    for (novainfra::Uint64 index = 0; index < operations; ++index) {
+        novainfra::log::info("short literal message");
+    }
+    const auto elapsed = ElapsedSeconds(start);
+    if (sink->count() != operations) {
+        std::abort();
+    }
+    return elapsed;
+}
+
+double BenchmarkCachedGlobalLiteral(novainfra::Uint64 operations)
+{
+    auto sink = std::make_shared<CountingSink>();
+    novainfra::log::setDefaultLogger(std::make_shared<novainfra::log::Logger>("benchmark-cached", sink));
+    const auto logger = novainfra::log::defaultLogger();
+
+    const auto start = Clock::now();
+    for (novainfra::Uint64 index = 0; index < operations; ++index) {
+        logger->info("short literal message");
+    }
+    const auto elapsed = ElapsedSeconds(start);
+    if (sink->count() != operations) {
+        std::abort();
+    }
+    return elapsed;
+}
+
+#ifndef NOVAINFRA_NO_EXCEPTIONS
+double BenchmarkThrowCatch(novainfra::Uint64 operations)
+{
+    volatile novainfra::Uint64 caught = 0;
+    const auto start = Clock::now();
+    for (novainfra::Uint64 index = 0; index < operations; ++index) {
+        try {
+            throw std::runtime_error("benchmark failure");
+        } catch (const std::runtime_error &) {
+            ++caught;
+        }
+    }
+    const auto elapsed = ElapsedSeconds(start);
+    if (caught != operations) {
+        std::abort();
+    }
+    return elapsed;
+}
+#endif
+
+double BenchmarkPatternFormatter(novainfra::Uint64 operations, const std::string &pattern)
+{
+    novainfra::log::formatters::PatternFormatter formatter(pattern);
+    novainfra::log::LogMsg message{
+        novainfra::core::Now(), novainfra::log::Level::INFO, novainfra::core::ThreadId(), {}, "benchmark",
+        "short literal message"};
     std::string output;
     const auto start = Clock::now();
-    for (nova::Uint64 index = 0; index < operations; ++index) {
+    for (novainfra::Uint64 index = 0; index < operations; ++index) {
         output.clear();
         formatter.format(message, output);
     }
@@ -170,15 +233,15 @@ struct AsyncTimings {
     double endToEndSeconds;
 };
 
-AsyncTimings BenchmarkAsync(nova::Uint64 operations, std::size_t producerCount)
+AsyncTimings BenchmarkAsync(novainfra::Uint64 operations, std::size_t producerCount)
 {
     auto sink = std::make_shared<CountingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(kAsyncQueueCapacity, 4);
-    std::vector<std::shared_ptr<nova::log::async::AsyncLogger>> loggers;
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(kAsyncQueueCapacity, 4);
+    std::vector<std::shared_ptr<novainfra::log::async::AsyncLogger>> loggers;
     loggers.reserve(kAsyncLoggerCount);
     for (std::size_t index = 0; index < kAsyncLoggerCount; ++index) {
-        loggers.push_back(
-            std::make_shared<nova::log::async::AsyncLogger>("async-" + std::to_string(index), sink, worker));
+        loggers.push_back(std::make_shared<novainfra::log::async::AsyncLogger>(
+            "async-" + std::to_string(index), sink, worker));
     }
 
     const auto start = Clock::now();
@@ -186,7 +249,7 @@ AsyncTimings BenchmarkAsync(nova::Uint64 operations, std::size_t producerCount)
     producers.reserve(producerCount);
     for (std::size_t producer = 0; producer < producerCount; ++producer) {
         producers.emplace_back([&, producer] {
-            for (nova::Uint64 index = producer; index < operations; index += producerCount) {
+            for (novainfra::Uint64 index = producer; index < operations; index += producerCount) {
                 loggers[index % loggers.size()]->info("value {:0240}", index);
             }
         });
@@ -205,9 +268,9 @@ AsyncTimings BenchmarkAsync(nova::Uint64 operations, std::size_t producerCount)
     return {producerSeconds, endToEndSeconds};
 }
 
-void RunAsyncBenchmark(const std::string &name, nova::Uint64 operations, std::size_t producerCount)
+void RunAsyncBenchmark(const std::string &name, novainfra::Uint64 operations, std::size_t producerCount)
 {
-    BenchmarkAsync(std::max<nova::Uint64>(operations / 20, producerCount), producerCount);
+    BenchmarkAsync(std::max<novainfra::Uint64>(operations / 20, producerCount), producerCount);
 
     std::vector<double> producerSamples;
     std::vector<double> endToEndSamples;
@@ -219,14 +282,14 @@ void RunAsyncBenchmark(const std::string &name, nova::Uint64 operations, std::si
         endToEndSamples.push_back(timings.endToEndSeconds);
     }
 
-    PrintResult(name + " producer", operations, Median(std::move(producerSamples)));
-    PrintResult(name + " end-to-end", operations, Median(std::move(endToEndSamples)));
+    PrintResult(name + " producer", operations, Summarize(std::move(producerSamples)));
+    PrintResult(name + " end-to-end", operations, Summarize(std::move(endToEndSamples)));
 }
 
 void PrintConfiguration()
 {
     constexpr auto queueSlots = kAsyncQueueCapacity + 1;
-    constexpr auto queuePayloadBytes = queueSlots * sizeof(nova::log::details::AsyncLogMsg);
+    constexpr auto queuePayloadBytes = queueSlots * sizeof(novainfra::log::details::AsyncLogMsg);
 
     std::cerr << "Nova logger microbenchmarks\n";
     std::cerr << "  compiler: " << __VERSION__ << '\n';
@@ -235,14 +298,14 @@ void PrintConfiguration()
 #else
     std::cerr << "  build: non-Release (assertions enabled)\n";
 #endif
-#ifdef NOVA_NO_THREAD_ID
+#ifdef NOVAINFRA_NO_THREAD_ID
     std::cerr << "  thread id: disabled\n";
 #else
     std::cerr << "  thread id: enabled\n";
 #endif
     std::cerr << "  samples: " << kMeasuredSamples << " measured after one warmup\n";
-    std::cerr << "  sizeof(LogMsg): " << sizeof(nova::log::LogMsg) << " bytes\n";
-    std::cerr << "  sizeof(AsyncLogMsg): " << sizeof(nova::log::details::AsyncLogMsg) << " bytes\n";
+    std::cerr << "  sizeof(LogMsg): " << sizeof(novainfra::log::LogMsg) << " bytes\n";
+    std::cerr << "  sizeof(AsyncLogMsg): " << sizeof(novainfra::log::details::AsyncLogMsg) << " bytes\n";
     std::cerr << "  async queue: " << kAsyncQueueCapacity << " usable slots, " << queueSlots
               << " allocated slots, about " << std::fixed << std::setprecision(2)
               << static_cast<double>(queuePayloadBytes) / (1024.0 * 1024.0) << " MiB payload storage\n\n";
@@ -252,22 +315,33 @@ void PrintConfiguration()
 
 int main()
 {
-    constexpr nova::Uint64 kFastOperations = 2'000'000;
-    constexpr nova::Uint64 kAsyncOperations = 400'000;
+    constexpr novainfra::Uint64 kFastOperations = 2'000'000;
+    constexpr novainfra::Uint64 kAsyncOperations = 400'000;
+    constexpr novainfra::Uint64 kExceptionOperations = 100'000;
 
     PrintConfiguration();
     RunBenchmark("filtered formatted/local", kFastOperations, BenchmarkFiltered);
     RunBenchmark("sync literal/local", kFastOperations, BenchmarkSynchronousLiteral);
     RunBenchmark("sync formatted/local", kFastOperations, BenchmarkSynchronousFormatted);
-    RunBenchmark("sync 240-byte/local", kFastOperations, BenchmarkSynchronousLong);
-    RunBenchmark("sync literal/global snapshot", kFastOperations, BenchmarkGlobalLiteral);
+    RunBenchmark("sync 32-byte/local", kFastOperations,
+                 [](novainfra::Uint64 operations) { return BenchmarkSynchronousMessage(operations, 32); });
+    RunBenchmark("sync 240-byte/formatted", kFastOperations, BenchmarkSynchronousLong);
+    RunBenchmark("sync 240-byte/local", kFastOperations,
+                 [](novainfra::Uint64 operations) { return BenchmarkSynchronousMessage(operations, 240); });
+    RunBenchmark("sync 1024-byte/local", kFastOperations,
+                 [](novainfra::Uint64 operations) { return BenchmarkSynchronousMessage(operations, 1024); });
+    RunBenchmark("sync literal/global lookup", kFastOperations, BenchmarkGlobalLiteral);
+    RunBenchmark("sync literal/cached global", kFastOperations, BenchmarkCachedGlobalLiteral);
     RunBenchmark("pattern message-only", kFastOperations,
-                 [](nova::Uint64 operations) { return BenchmarkPatternFormatter(operations, "%v"); });
-    RunBenchmark("pattern common datetime", kFastOperations, [](nova::Uint64 operations) {
+                 [](novainfra::Uint64 operations) { return BenchmarkPatternFormatter(operations, "%v"); });
+    RunBenchmark("pattern common datetime", kFastOperations, [](novainfra::Uint64 operations) {
         return BenchmarkPatternFormatter(operations, "%Y-%m-%d %H:%M:%S.%e [%l] [%n] [%t] %v");
     });
     RunBenchmark("pattern default %+", kFastOperations,
-                 [](nova::Uint64 operations) { return BenchmarkPatternFormatter(operations, "%+"); });
+                 [](novainfra::Uint64 operations) { return BenchmarkPatternFormatter(operations, "%+"); });
+#ifndef NOVAINFRA_NO_EXCEPTIONS
+    RunBenchmark("throw/catch runtime_error", kExceptionOperations, BenchmarkThrowCatch);
+#endif
     RunAsyncBenchmark("async 1p/64l/240-byte", kAsyncOperations, 1);
     RunAsyncBenchmark("async 4p/64l/240-byte", kAsyncOperations, 4);
     return 0;

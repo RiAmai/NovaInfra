@@ -31,16 +31,18 @@ struct fmt::formatter<CountingFormattedValue> : fmt::formatter<int> {
 
 namespace {
 
-static_assert(!std::is_copy_assignable<nova::log::Logger>::value, "Logger assignment must stay disabled");
-static_assert(!std::is_move_assignable<nova::log::Logger>::value, "Logger assignment must stay disabled");
-static_assert(std::is_same<decltype(std::declval<nova::log::Logger &>().sinks()),
-                           const std::vector<nova::log::sinks::SinkPtr> &>::value,
+static_assert(!std::is_copy_assignable<novainfra::log::Logger>::value,
+              "Logger assignment must stay disabled");
+static_assert(!std::is_move_assignable<novainfra::log::Logger>::value,
+              "Logger assignment must stay disabled");
+static_assert(std::is_same<decltype(std::declval<novainfra::log::Logger &>().sinks()),
+                           const std::vector<novainfra::log::sinks::SinkPtr> &>::value,
               "Logger sinks must be immutable after construction");
 
-class RecordingSink final : public nova::log::sinks::ISink
+class RecordingSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
-    void log(const nova::log::LogMsg &msg) override
+    void log(const novainfra::log::LogMsg &msg) NOVAINFRA_OVERRIDE
     {
         const auto assignView = [](std::string &destination, std::string_view source) {
             destination.clear();
@@ -56,37 +58,38 @@ public:
         lastMessage = msg;
         lastMessage.loggerName = lastLoggerName;
         lastMessage.message = lastMessageText;
-        lastMessage.source = nova::log::SourceLocation{lastSourceFile, msg.source.line, lastSourceFunction};
+        lastMessage.source =
+            novainfra::log::SourceLocation{lastSourceFile, msg.source.line, lastSourceFunction};
         messages.emplace_back(msg.message);
         levels.push_back(msg.level);
     }
 
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
-    void flush() override { ++flushCount; }
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
+    void flush() NOVAINFRA_OVERRIDE { ++flushCount; }
 
     int logCount = 0;
     int flushCount = 0;
-    nova::log::LogMsg lastMessage{};
+    novainfra::log::LogMsg lastMessage{};
     std::string lastLoggerName;
     std::string lastMessageText;
     std::string lastSourceFile;
     std::string lastSourceFunction;
     std::vector<std::string> messages;
-    std::vector<nova::log::Level> levels;
+    std::vector<novainfra::log::Level> levels;
 };
 
-class ConcreteBaseSink final : public nova::log::sinks::BaseSink<std::mutex>
+class ConcreteBaseSink NOVAINFRA_FINAL : public novainfra::log::sinks::BaseSink<std::mutex>
 {
 public:
     using BaseSink::BaseSink;
 
 private:
-    void _log(const nova::log::LogMsg &) override {}
-    void _flush() override {}
+    void _log(const novainfra::log::LogMsg &) NOVAINFRA_OVERRIDE {}
+    void _flush() NOVAINFRA_OVERRIDE {}
 };
 
-class ThrowingSink final : public nova::log::sinks::ISink
+class ThrowingSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
     enum class Failure {
@@ -96,7 +99,7 @@ public:
 
     explicit ThrowingSink(Failure failure) : failure_(failure) {}
 
-    void log(const nova::log::LogMsg &) override
+    void log(const novainfra::log::LogMsg &) NOVAINFRA_OVERRIDE
     {
         if (failure_ == Failure::STANDARD) {
             throw std::runtime_error("sink failure");
@@ -104,22 +107,22 @@ public:
         throw 42;
     }
 
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
-    void flush() override {}
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
+    void flush() NOVAINFRA_OVERRIDE {}
 
 private:
     Failure failure_;
 };
 
-class ThreadSafeCountingSink final : public nova::log::sinks::BaseSink<std::mutex>
+class ThreadSafeCountingSink NOVAINFRA_FINAL : public novainfra::log::sinks::BaseSink<std::mutex>
 {
 public:
     int count() const { return count_.load(); }
 
 private:
-    void _log(const nova::log::LogMsg &) override { ++count_; }
-    void _flush() override {}
+    void _log(const novainfra::log::LogMsg &) NOVAINFRA_OVERRIDE { ++count_; }
+    void _flush() NOVAINFRA_OVERRIDE {}
 
     std::atomic<int> count_{0};
 };
@@ -129,32 +132,24 @@ TEST(ExceptionMacros, CatchBodiesHandleStandardAndUnknownExceptions)
     bool standardCaught = false;
     bool unknownCaught = false;
 
-    NOVA_TRY
+    NOVAINFRA_TRY
     {
         throw std::runtime_error("standard failure");
     }
-    NOVA_CATCH_STD_BODY({
-        standardCaught = std::string(ex.what()) == "standard failure";
-    })
-    NOVA_CATCH_ALL_BODY({
-        unknownCaught = true;
-    })
+    NOVAINFRA_CATCH_STD_BODY({ standardCaught = std::string(ex.what()) == "standard failure"; })
+    NOVAINFRA_CATCH_ALL_BODY({ unknownCaught = true; })
 
     EXPECT_TRUE(standardCaught);
     EXPECT_FALSE(unknownCaught);
 
     standardCaught = false;
     unknownCaught = false;
-    NOVA_TRY
+    NOVAINFRA_TRY
     {
         throw 7;
     }
-    NOVA_CATCH_STD_BODY({
-        standardCaught = true;
-    })
-    NOVA_CATCH_ALL_BODY({
-        unknownCaught = true;
-    })
+    NOVAINFRA_CATCH_STD_BODY({ standardCaught = true; })
+    NOVAINFRA_CATCH_ALL_BODY({ unknownCaught = true; })
 
     EXPECT_FALSE(standardCaught);
     EXPECT_TRUE(unknownCaught);
@@ -164,14 +159,14 @@ TEST(LoggerBaseline, SinkDefaultsToTrace)
 {
     RecordingSink sink;
 
-    EXPECT_EQ(sink.level(), nova::log::Level::TRACE);
-    EXPECT_TRUE(sink.shouldLog(nova::log::Level::TRACE));
+    EXPECT_EQ(sink.level(), novainfra::log::Level::TRACE);
+    EXPECT_TRUE(sink.shouldLog(novainfra::log::Level::TRACE));
 }
 
 TEST(LoggerBaseline, SinkCanCopyTransientMessageViews)
 {
     auto sink = std::make_shared<RecordingSink>();
-    nova::log::Logger logger("baseline", sink);
+    novainfra::log::Logger logger("baseline", sink);
 
     logger.info("message");
 
@@ -182,8 +177,8 @@ TEST(LoggerBaseline, SinkCanCopyTransientMessageViews)
 
 TEST(SourceLocation, DistinguishesStaticAndBorrowedStorage)
 {
-    constexpr auto staticSource = nova::log::SourceLocation::fromStatic("static.cpp", 7, "function");
-    const nova::log::SourceLocation borrowedSource{"borrowed.cpp", 8, "function"};
+    constexpr auto staticSource = novainfra::log::SourceLocation::fromStatic("static.cpp", 7, "function");
+    const novainfra::log::SourceLocation borrowedSource{"borrowed.cpp", 8, "function"};
 
     EXPECT_TRUE(staticSource.hasStaticStorage());
     EXPECT_FALSE(borrowedSource.hasStaticStorage());
@@ -192,21 +187,21 @@ TEST(SourceLocation, DistinguishesStaticAndBorrowedStorage)
 TEST(LoggerBaseline, CapturesConfiguredNumericThreadId)
 {
     auto sink = std::make_shared<RecordingSink>();
-    nova::log::Logger logger("thread-id", sink);
+    novainfra::log::Logger logger("thread-id", sink);
 
     logger.info("message");
 
-#ifdef NOVA_NO_THREAD_ID
+#ifdef NOVAINFRA_NO_THREAD_ID
     EXPECT_EQ(sink->lastMessage.threadId, 0U);
 #else
-    EXPECT_EQ(sink->lastMessage.threadId, nova::core::ThreadId());
+    EXPECT_EQ(sink->lastMessage.threadId, novainfra::core::ThreadId());
 #endif
 }
 
 TEST(LoggerFormatting, FormatsArgumentsForAllLevelMethods)
 {
     auto sink = std::make_shared<RecordingSink>();
-    nova::log::Logger logger("format", sink);
+    novainfra::log::Logger logger("format", sink);
 
     logger.trace("trace {}", 1);
     logger.debug("debug {:04d}", 2);
@@ -217,20 +212,20 @@ TEST(LoggerFormatting, FormatsArgumentsForAllLevelMethods)
 
     EXPECT_EQ(sink->messages, (std::vector<std::string>{"trace 1", "debug 0002", "info 3.50", "warn four",
                                                         "error 5", "critical 6"}));
-    EXPECT_EQ(sink->levels,
-              (std::vector<nova::log::Level>{nova::log::Level::TRACE, nova::log::Level::DEBUG,
-                                             nova::log::Level::INFO, nova::log::Level::WARN,
-                                             nova::log::Level::ERROR, nova::log::Level::CRITICAL}));
+    EXPECT_EQ(sink->levels, (std::vector<novainfra::log::Level>{
+                                novainfra::log::Level::TRACE, novainfra::log::Level::DEBUG,
+                                novainfra::log::Level::INFO, novainfra::log::Level::WARN,
+                                novainfra::log::Level::ERROR, novainfra::log::Level::CRITICAL}));
 }
 
 TEST(LoggerFormatting, GenericLogAndDynamicFormatsAreSupported)
 {
     auto sink = std::make_shared<RecordingSink>();
-    nova::log::Logger logger("format", sink);
+    novainfra::log::Logger logger("format", sink);
     std::string dynamicFormat = "dynamic {}";
 
-    logger.log(nova::log::SourceLocation{"file.cpp", 12, "function"}, nova::log::Level::INFO, "generic {}",
-               1);
+    logger.log(novainfra::log::SourceLocation{"file.cpp", 12, "function"}, novainfra::log::Level::INFO,
+               "generic {}", 1);
     logger.info(dynamicFormat, 2);
     logger.info(fmt::runtime(dynamicFormat), 3);
 
@@ -241,7 +236,7 @@ TEST(LoggerFormatting, GenericLogAndDynamicFormatsAreSupported)
 TEST(LoggerFormatting, SingleMessageKeepsBracesLiteral)
 {
     auto sink = std::make_shared<RecordingSink>();
-    nova::log::Logger logger("format", sink);
+    novainfra::log::Logger logger("format", sink);
     std::string message = "literal {} braces";
 
     logger.info(message);
@@ -252,7 +247,7 @@ TEST(LoggerFormatting, SingleMessageKeepsBracesLiteral)
 TEST(LoggerFormatting, PreservesLongAndEmbeddedNullArguments)
 {
     auto sink = std::make_shared<RecordingSink>();
-    nova::log::Logger logger("format", sink);
+    novainfra::log::Logger logger("format", sink);
     const std::string longMessage(1024, 'x');
     const std::string embeddedNull("left\0right", 10);
 
@@ -266,7 +261,7 @@ TEST(LoggerFormatting, PreservesLongAndEmbeddedNullArguments)
 TEST(LoggerFormatting, InvalidRuntimeFormatIsReportedWithoutCallingSink)
 {
     auto sink = std::make_shared<RecordingSink>();
-    nova::log::Logger logger("format", sink);
+    novainfra::log::Logger logger("format", sink);
     int errorCount = 0;
     std::string errorMessage;
     logger.setErrHandler([&](const std::string &message) {
@@ -284,8 +279,8 @@ TEST(LoggerFormatting, InvalidRuntimeFormatIsReportedWithoutCallingSink)
 TEST(LoggerFormatting, LoggerLevelFilteringSkipsUserFormatter)
 {
     auto sink = std::make_shared<RecordingSink>();
-    nova::log::Logger logger("format", sink);
-    logger.setLevel(nova::log::Level::ERROR);
+    novainfra::log::Logger logger("format", sink);
+    logger.setLevel(novainfra::log::Level::ERROR);
     std::atomic<int> formatCount{0};
 
     logger.info("{}", CountingFormattedValue{7, &formatCount});
@@ -297,7 +292,7 @@ TEST(LoggerFormatting, LoggerLevelFilteringSkipsUserFormatter)
 TEST(LoggerFlush, DoesNotFlushAutomaticallyByDefault)
 {
     auto sink = std::make_shared<RecordingSink>();
-    nova::log::Logger logger("flush", sink);
+    novainfra::log::Logger logger("flush", sink);
 
     logger.info("message");
 
@@ -307,17 +302,17 @@ TEST(LoggerFlush, DoesNotFlushAutomaticallyByDefault)
 
 TEST(PatternFormatter, AcceptsSupportedPatternsAndRejectsUnknownFlags)
 {
-    EXPECT_NO_THROW(nova::log::formatters::PatternFormatter("%v"));
-    EXPECT_THROW(nova::log::formatters::PatternFormatter("%q"), std::invalid_argument);
+    EXPECT_NO_THROW(novainfra::log::formatters::PatternFormatter("%v"));
+    EXPECT_THROW(novainfra::log::formatters::PatternFormatter("%q"), std::invalid_argument);
 
-    nova::log::formatters::PatternFormatter formatter;
+    novainfra::log::formatters::PatternFormatter formatter;
     EXPECT_NO_THROW(formatter.setPattern("%n"));
     EXPECT_THROW(formatter.setPattern("%q"), std::invalid_argument);
 }
 
 TEST(LoggerSinks, EmptySinkListIsSafe)
 {
-    nova::log::Logger logger("empty");
+    novainfra::log::Logger logger("empty");
 
     EXPECT_NO_THROW(logger.info("message"));
     EXPECT_NO_THROW(logger.flush());
@@ -325,19 +320,19 @@ TEST(LoggerSinks, EmptySinkListIsSafe)
 
 TEST(LoggerSinks, RejectsNullSinkAtConstruction)
 {
-    EXPECT_THROW(nova::log::Logger("null", nova::log::sinks::SinkPtr{}), std::invalid_argument);
+    EXPECT_THROW(novainfra::log::Logger("null", novainfra::log::sinks::SinkPtr{}), std::invalid_argument);
 }
 
 TEST(BaseSink, RejectsNullFormatter)
 {
-    nova::log::sinks::ConsoleOutSink<std::mutex> sink;
+    novainfra::log::sinks::ConsoleOutSink<std::mutex> sink;
 
     EXPECT_THROW(sink.setFormatter(nullptr), std::invalid_argument);
 }
 
 TEST(LoggerSinks, RejectsNullFormatterEvenWithoutSinks)
 {
-    nova::log::Logger logger("empty");
+    novainfra::log::Logger logger("empty");
 
     EXPECT_THROW(logger.setFormatter(nullptr), std::invalid_argument);
 }
@@ -350,14 +345,14 @@ TEST(BaseSink, RejectsNullFormatterAtConstruction)
 TEST(LoggerFiltering, AppliesLoggerAndSinkThresholds)
 {
     auto sink = std::make_shared<RecordingSink>();
-    sink->setLevel(nova::log::Level::ERROR);
-    nova::log::Logger logger("filter", sink);
-    logger.setLevel(nova::log::Level::WARN);
+    sink->setLevel(novainfra::log::Level::ERROR);
+    novainfra::log::Logger logger("filter", sink);
+    logger.setLevel(novainfra::log::Level::WARN);
 
     logger.info("logger filtered");
     logger.warn("sink filtered");
     logger.error("accepted");
-    logger.log({}, nova::log::Level::OFF, "off");
+    logger.log({}, novainfra::log::Level::OFF, "off");
 
     EXPECT_EQ(sink->logCount, 1);
     EXPECT_EQ(sink->lastMessage.message, "accepted");
@@ -366,8 +361,8 @@ TEST(LoggerFiltering, AppliesLoggerAndSinkThresholds)
 TEST(LoggerFlush, FlushesAtConfiguredLevelAndOnExplicitRequest)
 {
     auto sink = std::make_shared<RecordingSink>();
-    nova::log::Logger logger("flush", sink);
-    logger.setFlushLevel(nova::log::Level::ERROR);
+    novainfra::log::Logger logger("flush", sink);
+    logger.setFlushLevel(novainfra::log::Level::ERROR);
 
     logger.info("no automatic flush");
     EXPECT_EQ(sink->flushCount, 0);
@@ -382,15 +377,15 @@ TEST(LoggerFlush, FlushesAtConfiguredLevelAndOnExplicitRequest)
 TEST(LoggerClone, PreservesConfigurationAndSharesSinks)
 {
     auto sink = std::make_shared<RecordingSink>();
-    nova::log::Logger logger("original", sink);
-    logger.setLevel(nova::log::Level::WARN);
-    logger.setFlushLevel(nova::log::Level::ERROR);
+    novainfra::log::Logger logger("original", sink);
+    logger.setLevel(novainfra::log::Level::WARN);
+    logger.setFlushLevel(novainfra::log::Level::ERROR);
 
     auto clone = logger.clone("clone");
 
     EXPECT_EQ(clone->name(), "clone");
-    EXPECT_EQ(clone->level(), nova::log::Level::WARN);
-    EXPECT_EQ(clone->flushLevel(), nova::log::Level::ERROR);
+    EXPECT_EQ(clone->level(), novainfra::log::Level::WARN);
+    EXPECT_EQ(clone->flushLevel(), novainfra::log::Level::ERROR);
     ASSERT_EQ(clone->sinks().size(), 1U);
     EXPECT_EQ(clone->sinks().front(), sink);
 }
@@ -398,7 +393,7 @@ TEST(LoggerClone, PreservesConfigurationAndSharesSinks)
 TEST(LoggerClone, CopiesCustomErrorHandler)
 {
     auto sink = std::make_shared<ThrowingSink>(ThrowingSink::Failure::STANDARD);
-    nova::log::Logger logger("original", sink);
+    novainfra::log::Logger logger("original", sink);
     int errorCount = 0;
     logger.setErrHandler([&errorCount](const std::string &) { ++errorCount; });
     auto clone = logger.clone("clone");
@@ -411,7 +406,7 @@ TEST(LoggerClone, CopiesCustomErrorHandler)
 TEST(LoggerErrors, StandardSinkExceptionIsReportedAndSwallowed)
 {
     auto sink = std::make_shared<ThrowingSink>(ThrowingSink::Failure::STANDARD);
-    nova::log::Logger logger("errors", sink);
+    novainfra::log::Logger logger("errors", sink);
     int errorCount = 0;
     std::string errorMessage;
     logger.setErrHandler([&](const std::string &message) {
@@ -427,7 +422,7 @@ TEST(LoggerErrors, StandardSinkExceptionIsReportedAndSwallowed)
 TEST(LoggerErrors, ThrowingErrorHandlerIsContained)
 {
     auto sink = std::make_shared<ThrowingSink>(ThrowingSink::Failure::STANDARD);
-    nova::log::Logger logger("errors", sink);
+    novainfra::log::Logger logger("errors", sink);
     logger.setErrHandler([](const std::string &) { throw std::runtime_error("handler failure"); });
 
     EXPECT_NO_THROW(logger.info("message"));
@@ -436,7 +431,7 @@ TEST(LoggerErrors, ThrowingErrorHandlerIsContained)
 TEST(LoggerErrors, UnknownSinkExceptionIsReportedAndRethrown)
 {
     auto sink = std::make_shared<ThrowingSink>(ThrowingSink::Failure::UNKNOWN);
-    nova::log::Logger logger("errors", sink);
+    novainfra::log::Logger logger("errors", sink);
     int errorCount = 0;
     logger.setErrHandler([&](const std::string &) { ++errorCount; });
 
@@ -447,7 +442,7 @@ TEST(LoggerErrors, UnknownSinkExceptionIsReportedAndRethrown)
 TEST(LoggerSource, MemberConvenienceFunctionsUseEmptySourceLocation)
 {
     auto sink = std::make_shared<RecordingSink>();
-    nova::log::Logger logger("source", sink);
+    novainfra::log::Logger logger("source", sink);
 
     logger.info("message");
 
@@ -461,7 +456,7 @@ TEST(LoggerConcurrency, MultipleThreadsCanLogToTheSameSynchronizedSink)
     constexpr int kThreadCount = 8;
     constexpr int kMessagesPerThread = 2000;
     auto sink = std::make_shared<ThreadSafeCountingSink>();
-    nova::log::Logger logger("concurrent", sink);
+    novainfra::log::Logger logger("concurrent", sink);
     std::vector<std::thread> threads;
 
     for (int threadIndex = 0; threadIndex < kThreadCount; ++threadIndex) {
@@ -482,7 +477,7 @@ TEST(LoggerConcurrency, LevelCanChangeWhileOtherThreadsLog)
 {
     constexpr int kIterations = 10000;
     auto sink = std::make_shared<ThreadSafeCountingSink>();
-    nova::log::Logger logger("level", sink);
+    novainfra::log::Logger logger("level", sink);
 
     std::thread writer([&logger]() {
         for (int iteration = 0; iteration < kIterations; ++iteration) {
@@ -491,7 +486,8 @@ TEST(LoggerConcurrency, LevelCanChangeWhileOtherThreadsLog)
     });
     std::thread configurator([&logger]() {
         for (int iteration = 0; iteration < kIterations; ++iteration) {
-            logger.setLevel((iteration % 2) == 0 ? nova::log::Level::TRACE : nova::log::Level::ERROR);
+            logger.setLevel((iteration % 2) == 0 ? novainfra::log::Level::TRACE
+                                                 : novainfra::log::Level::ERROR);
         }
     });
 

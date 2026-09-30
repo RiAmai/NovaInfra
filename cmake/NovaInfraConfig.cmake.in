@@ -1,0 +1,30 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+if("@MODULES_LOGGER_ENABLE@")
+    find_dependency(Threads)
+endif()
+
+if("@MODULES_SQLITE_POOL_ENABLE@")
+    find_dependency(Threads)
+    if("@SQLITE_BACKEND@" STREQUAL "plain")
+        find_dependency(SQLite3)
+    endif()
+endif()
+
+if("@MODULES_THREAD_POOL_ENABLE@")
+    find_dependency(Threads)
+endif()
+
+if("@MODULES_EVENT_BUS_ENABLE@")
+    find_dependency(Threads)
+endif()
+
+if("@MODULES_CONFIG_ENABLE@")
+    find_dependency(Threads)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/NovaInfraTargets.cmake")
+
+check_required_components(NovaInfra)

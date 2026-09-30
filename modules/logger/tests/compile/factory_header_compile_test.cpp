@@ -3,7 +3,8 @@
 
 int main()
 {
-    auto logger = nova::log::factories::SynchronousFactory::create<nova::log::sinks::ConsoleOutSinkMt>(
-        "factory-header");
+    auto logger =
+        novainfra::log::factories::SynchronousFactory::create<novainfra::log::sinks::ConsoleOutSinkMt>(
+            "factory-header");
     return logger ? 0 : 1;
 }

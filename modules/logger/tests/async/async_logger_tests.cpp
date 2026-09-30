@@ -1,7 +1,7 @@
 #include <core/mpmc_blocking_queue.h>
 #include <logger/async/async_log_thread_pool.h>
 #include <logger/async/async_logger.h>
-#include <logger/novalog.h>
+#include <logger/log.h>
 #include <logger/sinks/base_sink.h>
 #include <logger/sinks/sink.h>
 
@@ -33,10 +33,10 @@ struct ObservedMessage {
     bool staticSource = false;
 };
 
-class RecordingSink final : public nova::log::sinks::ISink
+class RecordingSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
-    void log(const nova::log::LogMsg &msg) override
+    void log(const novainfra::log::LogMsg &msg) NOVAINFRA_OVERRIDE
     {
         std::lock_guard<std::mutex> lock(mutex_);
         messages_.push_back({std::string(msg.message), std::string(msg.source.file),
@@ -44,10 +44,10 @@ public:
                              msg.source.hasStaticStorage()});
     }
 
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
 
-    void flush() override
+    void flush() NOVAINFRA_OVERRIDE
     {
         std::lock_guard<std::mutex> lock(mutex_);
         ++flushCount_;
@@ -71,10 +71,10 @@ private:
     int flushCount_ = 0;
 };
 
-class BlockingRecordingSink final : public nova::log::sinks::ISink
+class BlockingRecordingSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
-    void log(const nova::log::LogMsg &msg) override
+    void log(const novainfra::log::LogMsg &msg) NOVAINFRA_OVERRIDE
     {
         std::unique_lock<std::mutex> lock(mutex_);
         if (!blockedOnce_) {
@@ -92,10 +92,10 @@ public:
                              msg.source.hasStaticStorage()});
     }
 
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
 
-    void flush() override
+    void flush() NOVAINFRA_OVERRIDE
     {
         std::lock_guard<std::mutex> lock(mutex_);
         ++flushCount_;
@@ -150,14 +150,14 @@ private:
     int flushCount_ = 0;
 };
 
-class ThrowOnceSink final : public nova::log::sinks::ISink
+class ThrowOnceSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
     enum class ExceptionType { STANDARD, UNKNOWN };
 
     explicit ThrowOnceSink(ExceptionType exceptionType) : exceptionType_(exceptionType) {}
 
-    void log(const nova::log::LogMsg &) override
+    void log(const novainfra::log::LogMsg &) NOVAINFRA_OVERRIDE
     {
         if (calls_.fetch_add(1) == 0) {
             if (exceptionType_ == ExceptionType::STANDARD) {
@@ -168,9 +168,9 @@ public:
         ++successes_;
     }
 
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
-    void flush() override {}
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
+    void flush() NOVAINFRA_OVERRIDE {}
 
     int successes() const { return successes_.load(); }
 
@@ -180,14 +180,14 @@ private:
     std::atomic<int> successes_{0};
 };
 
-class ParallelRecordingSink final : public nova::log::sinks::ISink
+class ParallelRecordingSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
     explicit ParallelRecordingSink(int target) : target_(target) {}
 
-    bool isThreadSafe() const noexcept override { return true; }
+    bool isThreadSafe() const NOVAINFRA_NOEXCEPT NOVAINFRA_OVERRIDE { return true; }
 
-    void log(const nova::log::LogMsg &) override
+    void log(const novainfra::log::LogMsg &) NOVAINFRA_OVERRIDE
     {
         std::unique_lock<std::mutex> lock(mutex_);
         ++active_;
@@ -198,9 +198,9 @@ public:
         ++messages_;
     }
 
-    void setPattern(const std::string &) override {}
-    void setFormatter(std::unique_ptr<nova::log::formatters::IFormatter>) override {}
-    void flush() override {}
+    void setPattern(const std::string &) NOVAINFRA_OVERRIDE {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) NOVAINFRA_OVERRIDE {}
+    void flush() NOVAINFRA_OVERRIDE {}
 
     bool waitUntilParallel(std::chrono::milliseconds timeout = 2s)
     {
@@ -237,15 +237,16 @@ private:
     bool released_{false};
 };
 
-static_assert(std::is_move_constructible<nova::log::details::AsyncLogMsg>::value,
+static_assert(std::is_move_constructible<novainfra::log::details::AsyncLogMsg>::value,
               "AsyncLogMsg must be movable");
-static_assert(std::is_move_assignable<nova::log::details::AsyncLogMsg>::value,
+static_assert(std::is_move_assignable<novainfra::log::details::AsyncLogMsg>::value,
               "AsyncLogMsg must be move assignable");
-static_assert(!std::is_copy_constructible<nova::log::details::AsyncLogMsg>::value,
+static_assert(!std::is_copy_constructible<novainfra::log::details::AsyncLogMsg>::value,
               "AsyncLogMsg must not be copied");
-static_assert(!std::is_copy_assignable<nova::log::details::AsyncLogMsg>::value,
+static_assert(!std::is_copy_assignable<novainfra::log::details::AsyncLogMsg>::value,
               "AsyncLogMsg must not be copied");
-static_assert(sizeof(nova::log::details::AsyncLogMsg) <= 432, "AsyncLogMsg queue payload must stay compact");
+static_assert(sizeof(novainfra::log::details::AsyncLogMsg) <= 432,
+              "AsyncLogMsg queue payload must stay compact");
 
 template <typename Predicate>
 bool WaitUntil(Predicate predicate, std::chrono::milliseconds timeout = 2s)
@@ -262,18 +263,18 @@ bool WaitUntil(Predicate predicate, std::chrono::milliseconds timeout = 2s)
 
 TEST(AsyncLogThreadPool, RejectsInvalidQueueCapacity)
 {
-    EXPECT_THROW(nova::log::async::AsyncLogThreadPool(0, 1), std::invalid_argument);
-    EXPECT_THROW(nova::log::async::AsyncLogThreadPool(1, 0), std::invalid_argument);
-    EXPECT_THROW(nova::log::async::AsyncLogThreadPool(1, 1001), std::invalid_argument);
+    EXPECT_THROW(novainfra::log::async::AsyncLogThreadPool(0, 1), std::invalid_argument);
+    EXPECT_THROW(novainfra::log::async::AsyncLogThreadPool(1, 0), std::invalid_argument);
+    EXPECT_THROW(novainfra::log::async::AsyncLogThreadPool(1, 1001), std::invalid_argument);
 }
 
 TEST(AsyncLogger, RejectsUnsafeSinkForMultipleWorkers)
 {
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(8, 2);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(8, 2);
     auto sink = std::make_shared<RecordingSink>();
 
     try {
-        (void)std::make_shared<nova::log::async::AsyncLogger>("unsafe", sink, worker);
+        (void)std::make_shared<novainfra::log::async::AsyncLogger>("unsafe", sink, worker);
         FAIL() << "expected construction to reject an unsafe sink";
     } catch (const std::invalid_argument &error) {
         const std::string message = error.what();
@@ -286,11 +287,11 @@ TEST(AsyncLogger, RejectsUnsafeSinkForMultipleWorkers)
 
 TEST(AsyncLogger, AllowsUnsafeSinkWithSingleWorker)
 {
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(8, 1);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(8, 1);
     auto sink = std::make_shared<RecordingSink>();
 
     EXPECT_NO_THROW({
-        auto logger = std::make_shared<nova::log::async::AsyncLogger>("single", sink, worker);
+        auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("single", sink, worker);
         logger->info("single worker");
         worker.reset();
     });
@@ -298,9 +299,9 @@ TEST(AsyncLogger, AllowsUnsafeSinkWithSingleWorker)
 
 TEST(AsyncLogger, MultipleWorkersCanProcessOneLoggerConcurrently)
 {
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(32, 4);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(32, 4);
     auto sink = std::make_shared<ParallelRecordingSink>(4);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>("parallel", sink, worker);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("parallel", sink, worker);
 
     for (int index = 0; index < 4; ++index) {
         logger->info("message {}", index);
@@ -315,7 +316,7 @@ TEST(AsyncLogger, MultipleWorkersCanProcessOneLoggerConcurrently)
 
 TEST(MpmcBlockingQueue, ReleasesOverrunItemsImmediately)
 {
-    nova::MpmcBlockingQueue<std::shared_ptr<int>> queue(1);
+    novainfra::MpmcBlockingQueue<std::shared_ptr<int>> queue(1);
     auto oldest = std::make_shared<int>(1);
     std::weak_ptr<int> oldestWeak = oldest;
     queue.enqueueNoWait(std::move(oldest));
@@ -335,23 +336,24 @@ TEST(AsyncLogMsg, MoveOperationsRebindOwnedDynamicFields)
     const auto expectedMessage = message;
     const auto expectedFile = file;
     const auto expectedFunction = function;
-    nova::log::LogMsg logMessage{
-        nova::SystemTimePoint{},
-        nova::log::Level::INFO,
+    novainfra::log::LogMsg logMessage{
+        novainfra::SystemTimePoint{},
+        novainfra::log::Level::INFO,
         7,
-        nova::log::SourceLocation{file, 73, function},
+        novainfra::log::SourceLocation{file, 73, function},
         "logger",
         message
     };
 
-    nova::log::details::AsyncLogMsg first(std::shared_ptr<nova::log::async::AsyncLogger>{},
-                                          nova::log::details::AsyncMsgType::LOG, std::move(logMessage));
+    novainfra::log::details::AsyncLogMsg first(std::shared_ptr<novainfra::log::async::AsyncLogger>{},
+                                               novainfra::log::details::AsyncMsgType::LOG,
+                                               std::move(logMessage));
     message.assign(2048, 'm');
     file.assign(2048, 'f');
     function.assign(2048, 'x');
 
-    nova::log::details::AsyncLogMsg second(std::move(first));
-    nova::log::details::AsyncLogMsg third(nova::log::details::AsyncMsgType::FLUSH);
+    novainfra::log::details::AsyncLogMsg second(std::move(first));
+    novainfra::log::details::AsyncLogMsg third(novainfra::log::details::AsyncMsgType::FLUSH);
     third = std::move(second);
 
     EXPECT_EQ(third.message, expectedMessage);
@@ -363,13 +365,14 @@ TEST(AsyncLogMsg, MoveOperationsRebindOwnedDynamicFields)
 
 TEST(AsyncLogMsg, MoveOperationsPreserveStaticSourceMarker)
 {
-    constexpr auto source = nova::log::SourceLocation::fromStatic("static.cpp", 17, "staticFunction");
-    nova::log::LogMsg logMessage{
-        nova::SystemTimePoint{}, nova::log::Level::INFO, 7, source, "logger", "message"};
-    nova::log::details::AsyncLogMsg first(std::shared_ptr<nova::log::async::AsyncLogger>{},
-                                          nova::log::details::AsyncMsgType::LOG, std::move(logMessage));
+    constexpr auto source = novainfra::log::SourceLocation::fromStatic("static.cpp", 17, "staticFunction");
+    novainfra::log::LogMsg logMessage{
+        novainfra::SystemTimePoint{}, novainfra::log::Level::INFO, 7, source, "logger", "message"};
+    novainfra::log::details::AsyncLogMsg first(std::shared_ptr<novainfra::log::async::AsyncLogger>{},
+                                               novainfra::log::details::AsyncMsgType::LOG,
+                                               std::move(logMessage));
 
-    nova::log::details::AsyncLogMsg second(std::move(first));
+    novainfra::log::details::AsyncLogMsg second(std::move(first));
 
     EXPECT_EQ(second.source.file, "static.cpp");
     EXPECT_EQ(second.source.function, "staticFunction");
@@ -380,8 +383,8 @@ TEST(AsyncLogMsg, MoveOperationsPreserveStaticSourceMarker)
 TEST(AsyncLogger, ShutdownDrainsMessagesAndFlushesSinks)
 {
     auto sink = std::make_shared<RecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(64, 1);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>("async", sink, worker);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(64, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("async", sink, worker);
 
     for (int i = 0; i < 50; ++i) {
         logger->info("message {}", i);
@@ -398,8 +401,8 @@ TEST(AsyncLogger, ShutdownDrainsMessagesAndFlushesSinks)
 TEST(AsyncLogger, ShutdownFlushesAfterCallerReleasesLogger)
 {
     auto sink = std::make_shared<RecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(4, 1);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>("async", sink, worker);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(4, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("async", sink, worker);
 
     logger->info("message");
     logger.reset();
@@ -412,10 +415,10 @@ TEST(AsyncLogger, ShutdownFlushesAfterCallerReleasesLogger)
 TEST(AsyncLogger, ReleasesProcessedLoggerBeforeWorkerShutdown)
 {
     auto sink = std::make_shared<RecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(8, 1);
-    std::weak_ptr<nova::log::async::AsyncLogger> weakLogger;
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(8, 1);
+    std::weak_ptr<novainfra::log::async::AsyncLogger> weakLogger;
     {
-        auto logger = std::make_shared<nova::log::async::AsyncLogger>("short-lived", sink, worker);
+        auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("short-lived", sink, worker);
         weakLogger = logger;
         logger->info("message");
     }
@@ -430,13 +433,13 @@ TEST(AsyncLogger, ReleasesProcessedLoggerBeforeWorkerShutdown)
 TEST(AsyncLogger, LoggerChurnDoesNotAccumulateStrongWorkerReferences)
 {
     auto sink = std::make_shared<RecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(32, 1);
-    std::vector<std::weak_ptr<nova::log::async::AsyncLogger>> weakLoggers;
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(32, 1);
+    std::vector<std::weak_ptr<novainfra::log::async::AsyncLogger>> weakLoggers;
     weakLoggers.reserve(600);
 
     for (int index = 0; index < 600; ++index) {
-        auto logger =
-            std::make_shared<nova::log::async::AsyncLogger>("churn-" + std::to_string(index), sink, worker);
+        auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("churn-" + std::to_string(index),
+                                                                           sink, worker);
         weakLoggers.push_back(logger);
         logger->info("{}", index);
     }
@@ -453,15 +456,16 @@ TEST(AsyncLogger, LoggerChurnDoesNotAccumulateStrongWorkerReferences)
 TEST(AsyncLogger, OwnsDynamicSourceLocationAcrossThreads)
 {
     auto sink = std::make_shared<BlockingRecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(4, 1);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>("async", sink, worker);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(4, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("async", sink, worker);
 
     logger->info("blocking message");
     ASSERT_TRUE(sink->waitUntilBlocked());
     {
         std::string file = "dynamic/source.cpp";
         std::string function = "dynamicFunction";
-        logger->log(nova::log::SourceLocation{file, 73, function}, nova::log::Level::INFO, "owned source");
+        logger->log(novainfra::log::SourceLocation{file, 73, function}, novainfra::log::Level::INFO,
+                    "owned source");
         file.assign(2048, 'x');
         function.assign(2048, 'y');
     }
@@ -481,8 +485,8 @@ TEST(AsyncLogger, OwnsDynamicSourceLocationAcrossThreads)
 TEST(AsyncLogger, OwnsLongAndEmbeddedNullMessages)
 {
     auto sink = std::make_shared<RecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(4, 1);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>("async", sink, worker);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(4, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("async", sink, worker);
     const std::string longMessage(2048, 'x');
     const std::string embeddedNull("left\0right", 10);
 
@@ -499,10 +503,10 @@ TEST(AsyncLogger, OwnsLongAndEmbeddedNullMessages)
 TEST(AsyncLogger, MacroSourceRetainsStaticStorageMarker)
 {
     auto sink = std::make_shared<RecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(4, 1);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>("async", sink, worker);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(4, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("async", sink, worker);
 
-    NOVA_LOGGER_INFO(logger, "macro source");
+    NOVAINFRA_LOGGER_INFO(logger, "macro source");
     worker.reset();
 
     const auto messages = sink->messages();
@@ -514,8 +518,8 @@ TEST(AsyncLogger, MacroSourceRetainsStaticStorageMarker)
 TEST(AsyncLogger, ContinuesAfterUnknownSinkException)
 {
     auto sink = std::make_shared<ThrowOnceSink>(ThrowOnceSink::ExceptionType::UNKNOWN);
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(4, 1);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>("async", sink, worker);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(4, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("async", sink, worker);
     std::atomic<int> errors{0};
     logger->setErrHandler([&](const std::string &) { ++errors; });
 
@@ -530,8 +534,8 @@ TEST(AsyncLogger, ContinuesAfterUnknownSinkException)
 TEST(AsyncLogger, ContinuesWhenCustomErrorHandlerThrows)
 {
     auto sink = std::make_shared<ThrowOnceSink>(ThrowOnceSink::ExceptionType::STANDARD);
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(4, 1);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>("async", sink, worker);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(4, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("async", sink, worker);
     logger->setErrHandler([](const std::string &) { throw std::runtime_error("handler failure"); });
 
     logger->info("throws");
@@ -544,19 +548,19 @@ TEST(AsyncLogger, ContinuesWhenCustomErrorHandlerThrows)
 TEST(AsyncLogger, RejectsInvalidOverflowPolicy)
 {
     auto sink = std::make_shared<RecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(4, 1);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(4, 1);
 
-    EXPECT_THROW(std::make_shared<nova::log::async::AsyncLogger>(
-                     "async", sink, worker, static_cast<nova::log::async::AsyncOverflowPolicy>(99)),
+    EXPECT_THROW(std::make_shared<novainfra::log::async::AsyncLogger>(
+                     "async", sink, worker, static_cast<novainfra::log::async::AsyncOverflowPolicy>(99)),
                  std::invalid_argument);
 }
 
 TEST(AsyncLogger, DiscardNewPolicyCountsAndDropsNewestLog)
 {
     auto sink = std::make_shared<BlockingRecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(1, 1);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>(
-        "async", sink, worker, nova::log::async::AsyncOverflowPolicy::DISCARD_NEW);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(1, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>(
+        "async", sink, worker, novainfra::log::async::AsyncOverflowPolicy::DISCARD_NEW);
 
     logger->info("first");
     ASSERT_TRUE(sink->waitUntilBlocked());
@@ -576,9 +580,9 @@ TEST(AsyncLogger, DiscardNewPolicyCountsAndDropsNewestLog)
 TEST(AsyncLogger, OverrunPolicyCountsAndDropsOldestQueuedLog)
 {
     auto sink = std::make_shared<BlockingRecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(1, 1);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>(
-        "async", sink, worker, nova::log::async::AsyncOverflowPolicy::OVER_RUN_OLDEST);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(1, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>(
+        "async", sink, worker, novainfra::log::async::AsyncOverflowPolicy::OVER_RUN_OLDEST);
 
     logger->info("first");
     ASSERT_TRUE(sink->waitUntilBlocked());
@@ -598,9 +602,9 @@ TEST(AsyncLogger, OverrunPolicyCountsAndDropsOldestQueuedLog)
 TEST(AsyncLogger, FlushControlMessageIsNotDiscardedWhenQueueIsFull)
 {
     auto sink = std::make_shared<BlockingRecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(1, 1);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>(
-        "async", sink, worker, nova::log::async::AsyncOverflowPolicy::DISCARD_NEW);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(1, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>(
+        "async", sink, worker, novainfra::log::async::AsyncOverflowPolicy::DISCARD_NEW);
 
     logger->info("first");
     ASSERT_TRUE(sink->waitUntilBlocked());
@@ -621,9 +625,9 @@ TEST(AsyncLogger, FlushControlMessageIsNotDiscardedWhenQueueIsFull)
 TEST(AsyncLogger, WorkerThreadFlushDoesNotDeadlockWhenQueueIsFull)
 {
     auto sink = std::make_shared<BlockingRecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(1, 1);
-    auto logger = std::make_shared<nova::log::async::AsyncLogger>("async", sink, worker);
-    std::weak_ptr<nova::log::async::AsyncLogger> weakLogger = logger;
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(1, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("async", sink, worker);
+    std::weak_ptr<novainfra::log::async::AsyncLogger> weakLogger = logger;
     sink->setReleaseCallback([weakLogger] {
         if (auto locked = weakLogger.lock()) {
             locked->flush();
@@ -647,8 +651,8 @@ TEST(AsyncLogger, WorkerThreadFlushDoesNotDeadlockWhenQueueIsFull)
 TEST(AsyncLogger, StackManagedInstanceReportsOwnershipError)
 {
     auto sink = std::make_shared<RecordingSink>();
-    auto worker = std::make_shared<nova::log::async::AsyncLogThreadPool>(4, 1);
-    nova::log::async::AsyncLogger logger("stack", sink, worker);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(4, 1);
+    novainfra::log::async::AsyncLogger logger("stack", sink, worker);
     int errors = 0;
     logger.setErrHandler([&](const std::string &) { ++errors; });
 

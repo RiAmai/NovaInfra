@@ -4,7 +4,7 @@
 #include <mutex>
 #include <stdexcept>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log {
 
 Logger::Logger(const Logger &other)
@@ -15,9 +15,11 @@ Logger::Logger(const Logger &other)
 {
 }
 
-Logger::Logger(Logger &&other) noexcept
-    : name_(std::move(other.name_)), level_(other.level_.load(std::memory_order_relaxed)),
-      flushLevel_(other.flushLevel_.load(std::memory_order_relaxed)), sinks_(std::move(other.sinks_)),
+Logger::Logger(Logger &&other) NOVAINFRA_NOEXCEPT
+    : name_(std::move(other.name_)),
+      level_(other.level_.load(std::memory_order_relaxed)),
+      flushLevel_(other.flushLevel_.load(std::memory_order_relaxed)),
+      sinks_(std::move(other.sinks_)),
       cstErrHandler_(std::atomic_exchange_explicit(&other.cstErrHandler_, std::shared_ptr<const ErrHandler>{},
                                                    std::memory_order_acq_rel)),
       tracer_(std::move(other.tracer_))
@@ -28,7 +30,7 @@ void Logger::validateSinks() const
 {
     for (const auto &sink : sinks_) {
         if (!sink) {
-            NOVA_THROW(std::invalid_argument("Logger sink must not be null"));
+            NOVAINFRA_THROW(std::invalid_argument("Logger sink must not be null"));
         }
     }
 }
@@ -40,11 +42,11 @@ void Logger::_flush()
             errHandler("Logger sink is null");
             continue;
         }
-        NOVA_TRY
+        NOVAINFRA_TRY
         {
             sink->flush();
         }
-        NOVA_LOG_DETAILS_CATCH(SourceLocation())
+        NOVAINFRA_LOG_DETAILS_CATCH(SourceLocation())
     }
 }
 
@@ -70,11 +72,11 @@ void Logger::sinkIt(const details::LogMsg &msg)
             continue;
         }
         if (sink->shouldLog(msg.level)) {
-            NOVA_TRY
+            NOVAINFRA_TRY
             {
                 sink->log(msg);
             }
-            NOVA_LOG_DETAILS_CATCH(msg.source)
+            NOVAINFRA_LOG_DETAILS_CATCH(msg.source)
         }
     }
     if (shouldFlush(msg.level)) {
@@ -82,15 +84,15 @@ void Logger::sinkIt(const details::LogMsg &msg)
     }
 }
 
-void Logger::errHandler(const std::string &msg) noexcept
+void Logger::errHandler(const std::string &msg) NOVAINFRA_NOEXCEPT
 {
     const auto handler = std::atomic_load_explicit(&cstErrHandler_, std::memory_order_acquire);
     if (handler) {
-        NOVA_TRY
+        NOVAINFRA_TRY
         {
             (*handler)(msg);
         }
-        NOVA_CATCH_ALL_BODY({
+        NOVAINFRA_CATCH_ALL_BODY({
             std::fputs("[*** LOG ERROR HANDLER FAILURE ***] custom error handler threw an exception\n",
                        stderr);
         })
@@ -113,4 +115,4 @@ void Logger::errHandler(const std::string &msg) noexcept
     }
 }
 }  // namespace log
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

@@ -12,7 +12,7 @@
 #include <string_view>
 #include <type_traits>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::formatters {
 namespace {
 template <typename Integer>
@@ -41,26 +41,26 @@ void AppendIntegerPaddedFallback(Integer value, std::size_t width, std::string &
     dst.append(buffer, result.ptr);
 }
 
-void WriteTwoDigits(nova::Uint32 value, char *dst)
+void WriteTwoDigits(novainfra::Uint32 value, char *dst)
 {
     dst[0] = static_cast<char>('0' + value / 10);
     dst[1] = static_cast<char>('0' + value % 10);
 }
 
-void WriteThreeDigits(nova::Uint32 value, char *dst)
+void WriteThreeDigits(novainfra::Uint32 value, char *dst)
 {
     dst[0] = static_cast<char>('0' + value / 100);
     WriteTwoDigits(value % 100, dst + 1);
 }
 
-void AppendTwoDigits(nova::Uint32 value, std::string &dst)
+void AppendTwoDigits(novainfra::Uint32 value, std::string &dst)
 {
     const auto offset = dst.size();
     dst.resize(offset + 2);
     WriteTwoDigits(value, dst.data() + offset);
 }
 
-void AppendThreeDigits(nova::Uint32 value, std::string &dst)
+void AppendThreeDigits(novainfra::Uint32 value, std::string &dst)
 {
     const auto offset = dst.size();
     dst.resize(offset + 3);
@@ -77,17 +77,17 @@ void AppendIntegerPadded(Integer value, std::size_t width, std::string &dst)
         }
     }
 
-    const auto unsignedValue = static_cast<nova::Uint64>(value);
+    const auto unsignedValue = static_cast<novainfra::Uint64>(value);
     switch (width) {
         case 2:
             if (unsignedValue < 100) {
-                AppendTwoDigits(static_cast<nova::Uint32>(unsignedValue), dst);
+                AppendTwoDigits(static_cast<novainfra::Uint32>(unsignedValue), dst);
                 return;
             }
             break;
         case 3:
             if (unsignedValue < 1'000) {
-                AppendThreeDigits(static_cast<nova::Uint32>(unsignedValue), dst);
+                AppendThreeDigits(static_cast<novainfra::Uint32>(unsignedValue), dst);
                 return;
             }
             break;
@@ -95,8 +95,9 @@ void AppendIntegerPadded(Integer value, std::size_t width, std::string &dst)
             if (unsignedValue < 1'000'000) {
                 const auto offset = dst.size();
                 dst.resize(offset + 6);
-                WriteThreeDigits(static_cast<nova::Uint32>(unsignedValue / 1'000), dst.data() + offset);
-                WriteThreeDigits(static_cast<nova::Uint32>(unsignedValue % 1'000), dst.data() + offset + 3);
+                WriteThreeDigits(static_cast<novainfra::Uint32>(unsignedValue / 1'000), dst.data() + offset);
+                WriteThreeDigits(static_cast<novainfra::Uint32>(unsignedValue % 1'000),
+                                 dst.data() + offset + 3);
                 return;
             }
             break;
@@ -104,10 +105,12 @@ void AppendIntegerPadded(Integer value, std::size_t width, std::string &dst)
             if (unsignedValue < 1'000'000'000) {
                 const auto offset = dst.size();
                 dst.resize(offset + 9);
-                WriteThreeDigits(static_cast<nova::Uint32>(unsignedValue / 1'000'000), dst.data() + offset);
-                WriteThreeDigits(static_cast<nova::Uint32>((unsignedValue / 1'000) % 1'000),
+                WriteThreeDigits(static_cast<novainfra::Uint32>(unsignedValue / 1'000'000),
+                                 dst.data() + offset);
+                WriteThreeDigits(static_cast<novainfra::Uint32>((unsignedValue / 1'000) % 1'000),
                                  dst.data() + offset + 3);
-                WriteThreeDigits(static_cast<nova::Uint32>(unsignedValue % 1'000), dst.data() + offset + 6);
+                WriteThreeDigits(static_cast<novainfra::Uint32>(unsignedValue % 1'000),
+                                 dst.data() + offset + 6);
                 return;
             }
             break;
@@ -118,32 +121,33 @@ void AppendIntegerPadded(Integer value, std::size_t width, std::string &dst)
 }
 
 template <typename Duration>
-nova::Int64 FractionalPart(nova::SystemTimePoint timestamp)
+novainfra::Int64 FractionalPart(novainfra::SystemTimePoint timestamp)
 {
     const auto sinceEpoch = timestamp.time_since_epoch();
-    if (sinceEpoch >= nova::SystemClock::duration::zero()) {
+    if (sinceEpoch >= novainfra::SystemClock::duration::zero()) {
         const auto total = std::chrono::duration_cast<Duration>(sinceEpoch).count();
         const auto unitsPerSecond = std::chrono::duration_cast<Duration>(std::chrono::seconds{1}).count();
-        return static_cast<nova::Int64>(total % unitsPerSecond);
+        return static_cast<novainfra::Int64>(total % unitsPerSecond);
     }
     const auto wholeSeconds = std::chrono::floor<std::chrono::seconds>(sinceEpoch);
-    return static_cast<nova::Int64>(std::chrono::duration_cast<Duration>(sinceEpoch - wholeSeconds).count());
+    return static_cast<novainfra::Int64>(
+        std::chrono::duration_cast<Duration>(sinceEpoch - wholeSeconds).count());
 }
 
-std::string_view LevelToString(nova::log::Level level)
+std::string_view LevelToString(novainfra::log::Level level)
 {
     switch (level) {
-        case nova::log::Level::TRACE:
+        case novainfra::log::Level::TRACE:
             return "TRACE";
-        case nova::log::Level::DEBUG:
+        case novainfra::log::Level::DEBUG:
             return "DEBUG";
-        case nova::log::Level::INFO:
+        case novainfra::log::Level::INFO:
             return "INFO";
-        case nova::log::Level::WARN:
+        case novainfra::log::Level::WARN:
             return "WARN";
-        case nova::log::Level::ERROR:
+        case novainfra::log::Level::ERROR:
             return "ERROR";
-        case nova::log::Level::CRITICAL:
+        case novainfra::log::Level::CRITICAL:
             return "CRITICAL";
         default:
             return "";
@@ -163,7 +167,7 @@ int To12Hour(const std::tm &time)
 
 std::string_view Basename(std::string_view filename)
 {
-    const auto position = filename.find_last_of(nova::core::kFolderSeps);
+    const auto position = filename.find_last_of(novainfra::core::kFolderSeps);
     return position == std::string_view::npos ? filename : filename.substr(position + 1);
 }
 
@@ -585,7 +589,7 @@ PatternFormatter::CompiledPattern PatternFormatter::compilePattern(const std::st
     constexpr auto kMaxOperand = (std::numeric_limits<Uint32>::max)();
     auto checkedOperand = [](std::size_t value) {
         if (value > kMaxOperand) {
-            NOVA_THROW(std::length_error("Log pattern exceeds the 32-bit opcode limit"));
+            NOVAINFRA_THROW(std::length_error("Log pattern exceeds the 32-bit opcode limit"));
         }
         return static_cast<Uint32>(value);
     };
@@ -597,7 +601,7 @@ PatternFormatter::CompiledPattern PatternFormatter::compilePattern(const std::st
             return;
         }
         if (pendingLiteral.size() > kMaxOperand - compiled.literals.size()) {
-            NOVA_THROW(std::length_error("Log pattern literal storage exceeds the 32-bit opcode limit"));
+            NOVAINFRA_THROW(std::length_error("Log pattern literal storage exceeds the 32-bit opcode limit"));
         }
         const auto offset = checkedOperand(compiled.literals.size());
         const auto size = checkedOperand(pendingLiteral.size());
@@ -612,7 +616,7 @@ PatternFormatter::CompiledPattern PatternFormatter::compilePattern(const std::st
             continue;
         }
         if (++index == pattern.size()) {
-            NOVA_THROW(std::invalid_argument("Log pattern must not end with '%'"));
+            NOVAINFRA_THROW(std::invalid_argument("Log pattern must not end with '%'"));
         }
 
         --index;
@@ -791,7 +795,7 @@ PatternFormatter::CompiledPattern PatternFormatter::compilePattern(const std::st
                 compiled.elapsedStates.emplace_back();
                 break;
             default:
-                NOVA_THROW(std::invalid_argument(std::string("Unsupported log pattern flag: %") + flag));
+                NOVAINFRA_THROW(std::invalid_argument(std::string("Unsupported log pattern flag: %") + flag));
                 break;
         }
         compiled.program.push_back(operation);
@@ -801,4 +805,4 @@ PatternFormatter::CompiledPattern PatternFormatter::compilePattern(const std::st
 }
 
 }  // namespace log::formatters
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

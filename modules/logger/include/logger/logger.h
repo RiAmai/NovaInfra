@@ -14,9 +14,9 @@
 #include <iterator>
 #include <memory>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log {
-class NOVA_LIB_PORT Logger
+class NOVAINFRA_LIB_PORT Logger
 {
 public:
     explicit Logger(std::string name) : name_(std::move(name)), sinks_() {}
@@ -32,7 +32,7 @@ public:
     virtual ~Logger() = default;
 
     Logger(const Logger &other);
-    Logger(Logger &&other) noexcept;
+    Logger(Logger &&other) NOVAINFRA_NOEXCEPT;
     Logger &operator=(const Logger &) = delete;
     Logger &operator=(Logger &&) = delete;
 
@@ -77,7 +77,7 @@ public:
     void setFormatter(std::unique_ptr<formatters::IFormatter> formatter)
     {
         if (!formatter) {
-            NOVA_THROW(std::invalid_argument("Logger formatter must not be null"));
+            NOVAINFRA_THROW(std::invalid_argument("Logger formatter must not be null"));
         }
         const auto lastSink = std::find_if(sinks_.rbegin(), sinks_.rend(),
                                            [](const auto &sink) { return static_cast<bool>(sink); });
@@ -139,12 +139,12 @@ public:
             return;
         }
 
-        NOVA_TRY
+        NOVAINFRA_TRY
         {
             details::LogMsg logMsg{logTime, source, name_, level, msg};
             logIt(logMsg);
         }
-        NOVA_LOG_DETAILS_CATCH(source)
+        NOVAINFRA_LOG_DETAILS_CATCH(source)
     }
 
     void log(SourceLocation source, Level level, std::string_view msg)
@@ -153,12 +153,12 @@ public:
             return;
         }
 
-        NOVA_TRY
+        NOVAINFRA_TRY
         {
             details::LogMsg logMsg{source, name_, level, msg};
             logIt(logMsg);
         }
-        NOVA_LOG_DETAILS_CATCH(source)
+        NOVAINFRA_LOG_DETAILS_CATCH(source)
     }
 
     void log(Level level, std::string_view msg) { log(SourceLocation{}, level, msg); }
@@ -255,7 +255,7 @@ protected:
             return;
         }
 
-        NOVA_TRY
+        NOVAINFRA_TRY
         {
             details::LogMemoryBuffer message;
             fmt::vformat_to(fmt::appender(message), fmt::string_view(format.data(), format.size()),
@@ -263,9 +263,9 @@ protected:
             details::LogMsg msg{source, name_, level, std::string_view(message.data(), message.size())};
             logIt(msg);
         }
-        NOVA_LOG_DETAILS_CATCH(source)
+        NOVAINFRA_LOG_DETAILS_CATCH(source)
     }
-    void errHandler(const std::string &msg) noexcept;
+    void errHandler(const std::string &msg) NOVAINFRA_NOEXCEPT;
 
     bool shouldLogOrBacktrace(Level level) const
     {
@@ -286,9 +286,9 @@ protected:
 
     void validateSinks() const;
 
-    static std::size_t currentThreadId() noexcept
+    static std::size_t currentThreadId() NOVAINFRA_NOEXCEPT
     {
-#ifdef NOVA_NO_THREAD_ID
+#ifdef NOVAINFRA_NO_THREAD_ID
         return 0;
 #else
         return core::ThreadId();
@@ -304,4 +304,4 @@ protected:
     details::BackTracer tracer_;
 };
 }  // namespace log
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

@@ -8,7 +8,7 @@
 #include <stdexcept>
 
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::sinks {
 
 // console out sink, supports automatic switching between stdout and stderr.
@@ -22,37 +22,37 @@ public:
         : mutex_(MutexTraits::mutex()), formatter_(std::make_unique<formatters::PatternFormatter>())
     {
     }
-    ~ConsoleOutSink() override = default;
-    NOVA_DISABLE_COPY_MOVE(ConsoleOutSink<MutexOrPolicy>)
+    ~ConsoleOutSink() NOVAINFRA_OVERRIDE = default;
+    NOVAINFRA_DISABLE_COPY_MOVE(ConsoleOutSink<MutexOrPolicy>)
 
-    void log(const details::LogMsg &msg) final override
+    void log(const details::LogMsg &msg) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
         std::lock_guard<Mutex> lock(mutex_);
         _log(msg);
     }
 
-    void setPattern(const std::string &pattern) final override
+    void setPattern(const std::string &pattern) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
         std::lock_guard<Mutex> lock(mutex_);
         _setFormatter(std::make_unique<formatters::PatternFormatter>(pattern));
     }
 
-    void setFormatter(std::unique_ptr<formatters::IFormatter> formatter) final override
+    void setFormatter(std::unique_ptr<formatters::IFormatter> formatter) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
         if (!formatter) {
-            NOVA_THROW(std::invalid_argument("Sink formatter must not be null"));
+            NOVAINFRA_THROW(std::invalid_argument("Sink formatter must not be null"));
         }
         std::lock_guard<Mutex> lock(mutex_);
         _setFormatter(std::move(formatter));
     }
 
-    void flush() final override
+    void flush() NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
         std::lock_guard<Mutex> lock(mutex_);
         _flush();
     }
 
-    bool isThreadSafe() const noexcept final override
+    bool isThreadSafe() const NOVAINFRA_NOEXCEPT NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
         return !std::is_same<Mutex, details::NullMutex>::value;
     }
@@ -68,7 +68,7 @@ protected:
             file = stderr;
         }
         if (!core::FwriteBytes(dstStr.data(), dstStr.size(), file)) {
-            NOVA_THROW(std::runtime_error("Failed writing log message to console"));
+            NOVAINFRA_THROW(std::runtime_error("Failed writing log message to console"));
         }
     }
 
@@ -77,10 +77,10 @@ protected:
         const auto stdoutResult = ::fflush(stdout);
         const auto stderrResult = ::fflush(stderr);
         if (stdoutResult != 0) {
-            NOVA_THROW(std::runtime_error("Failed flushing stdout"));
+            NOVAINFRA_THROW(std::runtime_error("Failed flushing stdout"));
         }
         if (stderrResult != 0) {
-            NOVA_THROW(std::runtime_error("Failed flushing stderr"));
+            NOVAINFRA_THROW(std::runtime_error("Failed flushing stderr"));
         }
     }
 
@@ -105,4 +105,4 @@ using ConsoleOutSinkMt = ConsoleOutSink<details::ConsoleMutex>;
 using ConsoleOutSinkSt = ConsoleOutSink<details::ConsoleNullMutex>;
 
 }  // namespace log::sinks
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

@@ -9,7 +9,7 @@
 #include <string>
 #include <utility>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::async {
 
 thread_local AsyncLogThreadPool::WorkerContext *AsyncLogThreadPool::currentWorkerContext_ = nullptr;
@@ -19,11 +19,11 @@ AsyncLogThreadPool::AsyncLogThreadPool(std::size_t queueMaxItems, std::size_t th
     : queue_(queueMaxItems)
 {
     if (threadMaxNum == 0 || threadMaxNum > kThreadMaxNum) {
-        NOVA_THROW(std::invalid_argument("AsyncLogThreadPool thread count must be between 1 and 1000"));
+        NOVAINFRA_THROW(std::invalid_argument("AsyncLogThreadPool thread count must be between 1 and 1000"));
     }
 
     workerPool_.reserve(threadMaxNum);
-    NOVA_TRY
+    NOVAINFRA_TRY
     {
         for (std::size_t index = 0; index < threadMaxNum; ++index) {
             workerPool_.emplace_back([this, onStartFunc, onStopFunc] {
@@ -33,7 +33,7 @@ AsyncLogThreadPool::AsyncLogThreadPool(std::size_t queueMaxItems, std::size_t th
             });
         }
     }
-    NOVA_CATCH_ALL_BODY({
+    NOVAINFRA_CATCH_ALL_BODY({
         for (std::size_t index = workerPool_.size(); index > 0; --index) {
             queue_.enqueue(details::AsyncLogMsg(details::AsyncMsgType::TERMINATE));
         }
@@ -42,7 +42,7 @@ AsyncLogThreadPool::AsyncLogThreadPool(std::size_t queueMaxItems, std::size_t th
                 worker.join();
             }
         }
-        NOVA_RETHROW_CURRENT();
+        NOVAINFRA_RETHROW_CURRENT();
     })
 }
 
@@ -57,7 +57,7 @@ AsyncLogThreadPool::AsyncLogThreadPool(std::size_t queueMaxItems, std::size_t th
 {
 }
 
-AsyncLogThreadPool::~AsyncLogThreadPool() noexcept
+AsyncLogThreadPool::~AsyncLogThreadPool() NOVAINFRA_NOEXCEPT
 {
     if (currentWorkerContext_ != nullptr && currentWorkerContext_->pool == this) {
         std::fputs("[*** ASYNC LOG ERROR ***] AsyncLogThreadPool cannot be destroyed by its worker thread\n",
@@ -114,9 +114,9 @@ void AsyncLogThreadPool::postFlush(std::shared_ptr<AsyncLogger> &&logger)
         if (context->isFlushing || !logger) {
             return;
         }
-        const auto alreadyPending = std::find(context->pendingFlushLoggers.begin(),
-                                              context->pendingFlushLoggers.end(), logger) !=
-                                    context->pendingFlushLoggers.end();
+        const auto alreadyPending =
+            std::find(context->pendingFlushLoggers.begin(), context->pendingFlushLoggers.end(), logger) !=
+            context->pendingFlushLoggers.end();
         if (!alreadyPending) {
             context->pendingFlushLoggers.push_back(std::move(logger));
         }
@@ -148,10 +148,10 @@ void AsyncLogThreadPool::postAsyncMsg(details::AsyncLogMsg &&newMsg, AsyncOverfl
             queue_.enqueueIfHaveRoom(std::move(newMsg));
             return;
     }
-    NOVA_THROW(std::invalid_argument("Invalid async overflow policy"));
+    NOVAINFRA_THROW(std::invalid_argument("Invalid async overflow policy"));
 }
 
-void AsyncLogThreadPool::workerLoop() noexcept
+void AsyncLogThreadPool::workerLoop() NOVAINFRA_NOEXCEPT
 {
     WorkerContext context;
     context.pool = this;
@@ -159,16 +159,12 @@ void AsyncLogThreadPool::workerLoop() noexcept
 
     while (true) {
         bool keepRunning = true;
-        NOVA_TRY
+        NOVAINFRA_TRY
         {
             keepRunning = processNextMsg(context);
         }
-        NOVA_CATCH_STD_BODY({
-            reportWorkerFailure(ex.what());
-        })
-        NOVA_CATCH_ALL_BODY({
-            reportWorkerFailure("unknown exception escaped async logger backend");
-        })
+        NOVAINFRA_CATCH_STD_BODY({ reportWorkerFailure(ex.what()); })
+        NOVAINFRA_CATCH_ALL_BODY({ reportWorkerFailure("unknown exception escaped async logger backend"); })
         flushPendingLoggers(context);
         if (!keepRunning) {
             break;
@@ -216,7 +212,7 @@ bool AsyncLogThreadPool::processNextMsg(WorkerContext &context)
     }
 }
 
-void AsyncLogThreadPool::flushPendingLoggers(WorkerContext &context) noexcept
+void AsyncLogThreadPool::flushPendingLoggers(WorkerContext &context) NOVAINFRA_NOEXCEPT
 {
     if (context.pendingFlushLoggers.empty() || context.isFlushing) {
         return;
@@ -230,23 +226,19 @@ void AsyncLogThreadPool::flushPendingLoggers(WorkerContext &context) noexcept
 }
 
 void AsyncLogThreadPool::flushLogger(WorkerContext &context,
-                                     const std::shared_ptr<AsyncLogger> &logger) noexcept
+                                     const std::shared_ptr<AsyncLogger> &logger) NOVAINFRA_NOEXCEPT
 {
     if (!logger || context.isFlushing) {
         return;
     }
 
     context.isFlushing = true;
-    NOVA_TRY
+    NOVAINFRA_TRY
     {
         logger->backendFlush();
     }
-    NOVA_CATCH_STD_BODY({
-        reportWorkerFailure(ex.what());
-    })
-    NOVA_CATCH_ALL_BODY({
-        reportWorkerFailure("unknown exception while flushing async logger");
-    })
+    NOVAINFRA_CATCH_STD_BODY({ reportWorkerFailure(ex.what()); })
+    NOVAINFRA_CATCH_ALL_BODY({ reportWorkerFailure("unknown exception while flushing async logger"); })
     context.isFlushing = false;
 }
 
@@ -256,7 +248,7 @@ void AsyncLogThreadPool::rememberLogger(const std::shared_ptr<AsyncLogger> &logg
         return;
     }
 
-    NOVA_TRY
+    NOVAINFRA_TRY
     {
         std::lock_guard<std::mutex> lock(registryMutex_);
         registeredLoggers_.insert_or_assign(logger.get(), logger);
@@ -265,9 +257,9 @@ void AsyncLogThreadPool::rememberLogger(const std::shared_ptr<AsyncLogger> &logg
             registrationsUntilPrune_ = kRegistryPruneInterval;
         }
     }
-    NOVA_CATCH_ALL_BODY({
+    NOVAINFRA_CATCH_ALL_BODY({
         logger->workerRegistered_.store(false, std::memory_order_release);
-        NOVA_RETHROW_CURRENT();
+        NOVAINFRA_RETHROW_CURRENT();
     })
 }
 
@@ -282,7 +274,7 @@ void AsyncLogThreadPool::pruneExpiredLoggersLocked()
     }
 }
 
-void AsyncLogThreadPool::flushRegisteredLoggers() noexcept
+void AsyncLogThreadPool::flushRegisteredLoggers() NOVAINFRA_NOEXCEPT
 {
     std::vector<std::shared_ptr<AsyncLogger>> liveLoggers;
     {
@@ -303,29 +295,28 @@ void AsyncLogThreadPool::flushRegisteredLoggers() noexcept
     }
 }
 
-void AsyncLogThreadPool::invokeCallback(const Callback &callback, const char *phase) noexcept
+void AsyncLogThreadPool::invokeCallback(const Callback &callback, const char *phase) NOVAINFRA_NOEXCEPT
 {
     if (!callback) {
         return;
     }
-    NOVA_TRY
+    NOVAINFRA_TRY
     {
         callback();
     }
-    NOVA_CATCH_STD_BODY({
+    NOVAINFRA_CATCH_STD_BODY({
         char message[256];
         std::snprintf(message, sizeof(message), "async worker %s callback failed: %s", phase, ex.what());
         reportWorkerFailure(message);
     })
-    NOVA_CATCH_ALL_BODY({
-        reportWorkerFailure("async worker callback failed with an unknown exception");
-    })
+    NOVAINFRA_CATCH_ALL_BODY(
+        { reportWorkerFailure("async worker callback failed with an unknown exception"); })
 }
 
-void AsyncLogThreadPool::reportWorkerFailure(const char *message) noexcept
+void AsyncLogThreadPool::reportWorkerFailure(const char *message) NOVAINFRA_NOEXCEPT
 {
     std::fprintf(stderr, "[*** ASYNC LOG ERROR ***] %s\n", message);
 }
 
 }  // namespace log::async
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

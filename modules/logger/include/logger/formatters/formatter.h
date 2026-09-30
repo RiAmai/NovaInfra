@@ -9,10 +9,10 @@
 #include <memory>
 #include <string>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::formatters {
 
-class NOVA_LIB_PORT IFormatter
+class NOVAINFRA_LIB_PORT IFormatter
 {
 public:
     virtual ~IFormatter() = default;
@@ -21,4 +21,4 @@ public:
 };
 
 }  // namespace log::formatters
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <utility>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log {
 
 namespace {
@@ -59,7 +59,7 @@ Registry::~Registry()
 void Registry::validateLogger(const std::shared_ptr<Logger> &logger)
 {
     if (!logger) {
-        NOVA_THROW(std::invalid_argument("Registry logger must not be null"));
+        NOVAINFRA_THROW(std::invalid_argument("Registry logger must not be null"));
     }
 }
 
@@ -72,8 +72,7 @@ Registry::ConfigSnapshot Registry::configSnapshotLocked(const std::string &logge
 {
     const auto levelIt = logLevels_.find(loggerName);
     const auto level = levelIt == logLevels_.end() ? globalLogLevel_ : levelIt->second;
-    return ConfigSnapshot{level,       globalFlushLevel_, formatter_,
-                          errHandler_, backtraceMsgNum_,  configRevision_};
+    return ConfigSnapshot{level, globalFlushLevel_, formatter_, errHandler_, backtraceMsgNum_};
 }
 
 std::vector<std::shared_ptr<Logger>> Registry::loggerSnapshotLocked() const
@@ -102,139 +101,117 @@ void Registry::applyConfig(const std::shared_ptr<Logger> &logger, const ConfigSn
 void Registry::registerLogger(std::shared_ptr<Logger> newLogger)
 {
     validateLogger(newLogger);
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
 
-    for (;;) {
-        ConfigSnapshot config;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (loggers_.find(newLogger->name()) != loggers_.end()) {
-                NOVA_THROW(std::runtime_error("logger with name '" + newLogger->name() + "' already exists"));
-            }
-            config = configSnapshotLocked(newLogger->name());
-        }
-
-        applyConfig(newLogger, config);
-
+    ConfigSnapshot config;
+    {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (configRevision_ != config.revision) {
-            continue;
-        }
         if (loggers_.find(newLogger->name()) != loggers_.end()) {
-            NOVA_THROW(std::runtime_error("logger with name '" + newLogger->name() + "' already exists"));
+            NOVAINFRA_THROW(
+                std::runtime_error("logger with name '" + newLogger->name() + "' already exists"));
         }
-        loggers_.emplace(newLogger->name(), std::move(newLogger));
-        return;
+        config = configSnapshotLocked(newLogger->name());
     }
+
+    applyConfig(newLogger, config);
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    loggers_.emplace(newLogger->name(), std::move(newLogger));
 }
 
 void Registry::registerOrReplaceLogger(std::shared_ptr<Logger> newLogger)
 {
     validateLogger(newLogger);
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
 
-    for (;;) {
-        ConfigSnapshot config;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            config = configSnapshotLocked(newLogger->name());
+    ConfigSnapshot config;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        config = configSnapshotLocked(newLogger->name());
+    }
+    applyConfig(newLogger, config);
+
+    std::shared_ptr<Logger> retiredLogger;
+    std::shared_ptr<Logger> retiredDefault;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto currentDefault = std::atomic_load_explicit(&defaultLogger_, std::memory_order_acquire);
+        const bool replacesDefault = currentDefault && currentDefault->name() == newLogger->name();
+        auto it = loggers_.find(newLogger->name());
+        if (it == loggers_.end()) {
+            loggers_.emplace(newLogger->name(), newLogger);
+        } else {
+            retiredLogger = std::move(it->second);
+            it->second = newLogger;
         }
-
-        applyConfig(newLogger, config);
-
-        std::shared_ptr<Logger> retiredLogger;
-        std::shared_ptr<Logger> retiredDefault;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (configRevision_ != config.revision) {
-                continue;
-            }
-
-            auto currentDefault = std::atomic_load_explicit(&defaultLogger_, std::memory_order_acquire);
-            const bool replacesDefault = currentDefault && currentDefault->name() == newLogger->name();
-            auto it = loggers_.find(newLogger->name());
-            if (it == loggers_.end()) {
-                loggers_.emplace(newLogger->name(), newLogger);
-            } else {
-                retiredLogger = std::move(it->second);
-                it->second = newLogger;
-            }
-            if (replacesDefault) {
-                retiredDefault =
-                    std::atomic_exchange_explicit(&defaultLogger_, newLogger, std::memory_order_acq_rel);
-            }
+        if (replacesDefault) {
+            retiredDefault =
+                std::atomic_exchange_explicit(&defaultLogger_, newLogger, std::memory_order_acq_rel);
         }
-        return;
     }
 }
 
 void Registry::initLogger(std::shared_ptr<Logger> newLogger)
 {
     validateLogger(newLogger);
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
 
-    for (;;) {
-        ConfigSnapshot config;
-        bool autoRegistration = false;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            config = configSnapshotLocked(newLogger->name());
-            autoRegistration = autoRegistration_;
-            if (autoRegistration && loggers_.find(newLogger->name()) != loggers_.end()) {
-                NOVA_THROW(std::runtime_error("logger with name '" + newLogger->name() + "' already exists"));
-            }
-        }
-
-        applyConfig(newLogger, config);
-
+    ConfigSnapshot config;
+    bool autoRegistration = false;
+    {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (configRevision_ != config.revision || autoRegistration_ != autoRegistration) {
-            continue;
+        config = configSnapshotLocked(newLogger->name());
+        autoRegistration = autoRegistration_;
+        if (autoRegistration && loggers_.find(newLogger->name()) != loggers_.end()) {
+            NOVAINFRA_THROW(
+                std::runtime_error("logger with name '" + newLogger->name() + "' already exists"));
         }
-        if (!autoRegistration) {
-            return;
-        }
+    }
+
+    applyConfig(newLogger, config);
+    if (!autoRegistration) {
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
         if (loggers_.find(newLogger->name()) != loggers_.end()) {
-            NOVA_THROW(std::runtime_error("logger with name '" + newLogger->name() + "' already exists"));
+            NOVAINFRA_THROW(
+                std::runtime_error("logger with name '" + newLogger->name() + "' already exists"));
         }
         loggers_.emplace(newLogger->name(), std::move(newLogger));
-        return;
     }
 }
 
 void Registry::setDefaultLogger(std::shared_ptr<Logger> newDefaultLogger)
 {
     validateLogger(newDefaultLogger);
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
 
-    for (;;) {
-        ConfigSnapshot config;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            config = configSnapshotLocked(newDefaultLogger->name());
+    ConfigSnapshot config;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        config = configSnapshotLocked(newDefaultLogger->name());
+    }
+    applyConfig(newDefaultLogger, config);
+
+    std::shared_ptr<Logger> retiredLogger;
+    std::shared_ptr<Logger> retiredDefault;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = loggers_.find(newDefaultLogger->name());
+        if (it == loggers_.end()) {
+            loggers_.emplace(newDefaultLogger->name(), newDefaultLogger);
+        } else {
+            retiredLogger = std::move(it->second);
+            it->second = newDefaultLogger;
         }
-
-        applyConfig(newDefaultLogger, config);
-
-        std::shared_ptr<Logger> retiredLogger;
-        std::shared_ptr<Logger> retiredDefault;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (configRevision_ != config.revision) {
-                continue;
-            }
-
-            auto it = loggers_.find(newDefaultLogger->name());
-            if (it == loggers_.end()) {
-                loggers_.emplace(newDefaultLogger->name(), newDefaultLogger);
-            } else {
-                retiredLogger = std::move(it->second);
-                it->second = newDefaultLogger;
-            }
-            retiredDefault =
-                std::atomic_exchange_explicit(&defaultLogger_, newDefaultLogger, std::memory_order_acq_rel);
-        }
-        return;
+        retiredDefault =
+            std::atomic_exchange_explicit(&defaultLogger_, newDefaultLogger, std::memory_order_acq_rel);
     }
 }
 
-std::shared_ptr<Logger> Registry::defaultLogger() const noexcept
+std::shared_ptr<Logger> Registry::defaultLogger() const NOVAINFRA_NOEXCEPT
 {
     return std::atomic_load_explicit(&defaultLogger_, std::memory_order_acquire);
 }
@@ -246,130 +223,30 @@ std::shared_ptr<Logger> Registry::getNameLogger(const std::string &name) const
     return it == loggers_.end() ? nullptr : it->second;
 }
 
-void Registry::applyLatestLevel(const std::shared_ptr<Logger> &logger)
-{
-    for (;;) {
-        Level level;
-        Uint64 revision;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            const auto it = logLevels_.find(logger->name());
-            level = it == logLevels_.end() ? globalLogLevel_ : it->second;
-            revision = levelRevision_;
-        }
-        logger->setLevel(level);
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (revision == levelRevision_) {
-                return;
-            }
-        }
-    }
-}
-
-void Registry::applyLatestFlushLevel(const std::shared_ptr<Logger> &logger)
-{
-    for (;;) {
-        Level level;
-        Uint64 revision;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            level = globalFlushLevel_;
-            revision = flushLevelRevision_;
-        }
-        logger->setFlushLevel(level);
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (revision == flushLevelRevision_) {
-                return;
-            }
-        }
-    }
-}
-
-void Registry::applyLatestFormatter(const std::shared_ptr<Logger> &logger)
-{
-    for (;;) {
-        std::shared_ptr<formatters::IFormatter> formatter;
-        Uint64 revision;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            formatter = formatter_;
-            revision = formatterRevision_;
-        }
-        logger->setFormatter(formatter->clone());
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (revision == formatterRevision_) {
-                return;
-            }
-        }
-    }
-}
-
-void Registry::applyLatestErrHandler(const std::shared_ptr<Logger> &logger)
-{
-    for (;;) {
-        std::shared_ptr<const ErrHandler> handler;
-        Uint64 revision;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            handler = errHandler_;
-            revision = errHandlerRevision_;
-        }
-        logger->setErrHandler(handler ? *handler : ErrHandler{});
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (revision == errHandlerRevision_) {
-                return;
-            }
-        }
-    }
-}
-
-void Registry::applyLatestBacktrace(const std::shared_ptr<Logger> &logger)
-{
-    for (;;) {
-        std::size_t messageCount;
-        Uint64 revision;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            messageCount = backtraceMsgNum_;
-            revision = backtraceRevision_;
-        }
-        if (messageCount == 0) {
-            logger->disableBacktrace();
-        } else {
-            logger->enableBacktrace(messageCount);
-        }
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (revision == backtraceRevision_) {
-                return;
-            }
-        }
-    }
-}
-
 void Registry::setLevel(Level level)
 {
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     std::vector<std::shared_ptr<Logger>> loggers;
     LogLevels retiredLevels;
+    Level effectiveGlobalLevel;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         globalLogLevel_ = level;
         retiredLevels = std::move(logLevels_);
-        ++levelRevision_;
-        ++configRevision_;
+        effectiveGlobalLevel = globalLogLevel_;
         loggers = loggerSnapshotLocked();
     }
-    applyToLoggers(loggers, [this](const auto &logger) { applyLatestLevel(logger); });
+    applyToLoggers(loggers,
+                   [effectiveGlobalLevel](const auto &logger) { logger->setLevel(effectiveGlobalLevel); });
 }
 
 void Registry::setLevels(LogLevels levels, const Level *globalLevel)
 {
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     std::vector<std::shared_ptr<Logger>> loggers;
     LogLevels retiredLevels;
+    LogLevels levelsSnapshot;
+    Level effectiveGlobalLevel;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         retiredLevels = std::move(logLevels_);
@@ -377,73 +254,86 @@ void Registry::setLevels(LogLevels levels, const Level *globalLevel)
         if (globalLevel) {
             globalLogLevel_ = *globalLevel;
         }
-        ++levelRevision_;
-        ++configRevision_;
+        levelsSnapshot = logLevels_;
+        effectiveGlobalLevel = globalLogLevel_;
         loggers = loggerSnapshotLocked();
     }
-    applyToLoggers(loggers, [this](const auto &logger) { applyLatestLevel(logger); });
+    applyToLoggers(loggers, [&levelsSnapshot, effectiveGlobalLevel](const auto &logger) {
+        const auto it = levelsSnapshot.find(logger->name());
+        logger->setLevel(it == levelsSnapshot.end() ? effectiveGlobalLevel : it->second);
+    });
 }
 
 void Registry::setFlushLevel(Level level)
 {
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     std::vector<std::shared_ptr<Logger>> loggers;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         globalFlushLevel_ = level;
-        ++flushLevelRevision_;
-        ++configRevision_;
         loggers = loggerSnapshotLocked();
     }
-    applyToLoggers(loggers, [this](const auto &logger) { applyLatestFlushLevel(logger); });
+    applyToLoggers(loggers, [level](const auto &logger) { logger->setFlushLevel(level); });
 }
 
 void Registry::setFormatter(std::unique_ptr<formatters::IFormatter> formatter)
 {
     if (!formatter) {
-        NOVA_THROW(std::invalid_argument("Registry formatter must not be null"));
+        NOVAINFRA_THROW(std::invalid_argument("Registry formatter must not be null"));
     }
 
     auto newFormatter = std::shared_ptr<formatters::IFormatter>(std::move(formatter));
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     std::shared_ptr<formatters::IFormatter> retiredFormatter;
+    std::shared_ptr<formatters::IFormatter> formatterSnapshot;
     std::vector<std::shared_ptr<Logger>> loggers;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         retiredFormatter = std::move(formatter_);
         formatter_ = std::move(newFormatter);
-        ++formatterRevision_;
-        ++configRevision_;
+        formatterSnapshot = formatter_;
         loggers = loggerSnapshotLocked();
     }
-    applyToLoggers(loggers, [this](const auto &logger) { applyLatestFormatter(logger); });
+    applyToLoggers(loggers, [&formatterSnapshot](const auto &logger) {
+        logger->setFormatter(formatterSnapshot->clone());
+    });
 }
 
 void Registry::setErrHandler(ErrHandler handler)
 {
     auto newHandler = handler ? std::make_shared<const ErrHandler>(std::move(handler)) : nullptr;
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     std::shared_ptr<const ErrHandler> retiredHandler;
+    std::shared_ptr<const ErrHandler> handlerSnapshot;
     std::vector<std::shared_ptr<Logger>> loggers;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         retiredHandler = std::move(errHandler_);
         errHandler_ = std::move(newHandler);
-        ++errHandlerRevision_;
-        ++configRevision_;
+        handlerSnapshot = errHandler_;
         loggers = loggerSnapshotLocked();
     }
-    applyToLoggers(loggers, [this](const auto &logger) { applyLatestErrHandler(logger); });
+    applyToLoggers(loggers, [&handlerSnapshot](const auto &logger) {
+        logger->setErrHandler(handlerSnapshot ? *handlerSnapshot : ErrHandler{});
+    });
 }
 
 void Registry::enableBacktrace(std::size_t messageCount)
 {
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     std::vector<std::shared_ptr<Logger>> loggers;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         backtraceMsgNum_ = messageCount;
-        ++backtraceRevision_;
-        ++configRevision_;
         loggers = loggerSnapshotLocked();
     }
-    applyToLoggers(loggers, [this](const auto &logger) { applyLatestBacktrace(logger); });
+    applyToLoggers(loggers, [messageCount](const auto &logger) {
+        if (messageCount == 0) {
+            logger->disableBacktrace();
+        } else {
+            logger->enableBacktrace(messageCount);
+        }
+    });
 }
 
 void Registry::disableBacktrace()
@@ -453,15 +343,18 @@ void Registry::disableBacktrace()
 
 void Registry::setWorker(std::shared_ptr<async::AsyncLogThreadPool> worker)
 {
+    std::unique_lock<std::mutex> updateLock(updateMutex_);
     std::shared_ptr<async::AsyncLogThreadPool> retiredWorker;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         retiredWorker = std::move(worker_);
         worker_ = std::move(worker);
     }
+    updateLock.unlock();
+    retiredWorker.reset();
 }
 
-std::shared_ptr<async::AsyncLogThreadPool> Registry::worker() const noexcept
+std::shared_ptr<async::AsyncLogThreadPool> Registry::worker() const NOVAINFRA_NOEXCEPT
 {
     std::lock_guard<std::mutex> lock(mutex_);
     return worker_;
@@ -469,6 +362,7 @@ std::shared_ptr<async::AsyncLogThreadPool> Registry::worker() const noexcept
 
 void Registry::setAutoRegistration(bool on)
 {
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     std::lock_guard<std::mutex> lock(mutex_);
     autoRegistration_ = on;
 }
@@ -476,7 +370,7 @@ void Registry::setAutoRegistration(bool on)
 void Registry::applyAll(const std::function<void(std::shared_ptr<Logger>)> &func)
 {
     if (!func) {
-        NOVA_THROW(std::invalid_argument("Registry callback must not be empty"));
+        NOVAINFRA_THROW(std::invalid_argument("Registry callback must not be empty"));
     }
 
     std::vector<std::shared_ptr<Logger>> loggers;
@@ -503,12 +397,13 @@ void Registry::flushAll()
 
 void Registry::dropLogger(const std::string &name)
 {
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     std::shared_ptr<Logger> retiredLogger;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         const auto currentDefault = std::atomic_load_explicit(&defaultLogger_, std::memory_order_acquire);
         if (currentDefault && currentDefault->name() == name) {
-            NOVA_THROW(std::invalid_argument("The default logger cannot be dropped"));
+            NOVAINFRA_THROW(std::invalid_argument("The default logger cannot be dropped"));
         }
         const auto it = loggers_.find(name);
         if (it != loggers_.end()) {
@@ -520,26 +415,22 @@ void Registry::dropLogger(const std::string &name)
 
 void Registry::dropAll()
 {
-    for (;;) {
-        const auto currentDefault = defaultLogger();
-        Loggers replacement;
-        replacement.emplace(currentDefault->name(), currentDefault);
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
+    const auto currentDefault = defaultLogger();
+    Loggers replacement;
+    replacement.emplace(currentDefault->name(), currentDefault);
 
-        Loggers retiredLoggers;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (std::atomic_load_explicit(&defaultLogger_, std::memory_order_acquire) != currentDefault) {
-                continue;
-            }
-            retiredLoggers = std::move(loggers_);
-            loggers_ = std::move(replacement);
-        }
-        return;
+    Loggers retiredLoggers;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        retiredLoggers = std::move(loggers_);
+        loggers_ = std::move(replacement);
     }
 }
 
 void Registry::shutdown()
 {
+    std::unique_lock<std::mutex> updateLock(updateMutex_);
     auto freshDefault = makeDefaultLogger();
     auto freshFormatter = std::make_shared<formatters::PatternFormatter>();
     freshDefault->setLevel(Level::INFO);
@@ -569,21 +460,15 @@ void Registry::shutdown()
         globalLogLevel_ = Level::INFO;
         globalFlushLevel_ = Level::OFF;
         autoRegistration_ = true;
-        ++levelRevision_;
-        ++flushLevelRevision_;
-        ++formatterRevision_;
-        ++errHandlerRevision_;
-        ++backtraceRevision_;
-        ++configRevision_;
-
         backtraceMsgNum_ = 0;
 
         loggers_ = std::move(freshLoggers);
     }
 
-    // Destruction drains and joins the worker without holding the registry mutex.
+    // Destruction drains and joins the worker without holding either Registry lock.
+    updateLock.unlock();
     retiredWorker.reset();
 }
 
 }  // namespace log
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

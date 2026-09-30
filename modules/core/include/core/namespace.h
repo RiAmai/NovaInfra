@@ -1,13 +1,13 @@
 #pragma once
 
-#ifndef NOVA_NAMEPSACE
-#  define NOVA_NAMEPSACE nova
+#ifndef NOVAINFRA_NAMESPACE
+#  define NOVAINFRA_NAMESPACE novainfra
 #endif
 
-#ifndef NOVA_NAMESPACE_BEGIN
-#  define NOVA_NAMESPACE_BEGIN namespace NOVA_NAMEPSACE {
+#ifndef NOVAINFRA_NAMESPACE_BEGIN
+#  define NOVAINFRA_NAMESPACE_BEGIN namespace NOVAINFRA_NAMESPACE {
 #endif
 
-#ifndef NOVA_NAMESPACE_END
-#  define NOVA_NAMESPACE_END }
+#ifndef NOVAINFRA_NAMESPACE_END
+#  define NOVAINFRA_NAMESPACE_END }
 #endif

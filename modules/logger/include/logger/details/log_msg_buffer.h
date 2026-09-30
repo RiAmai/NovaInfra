@@ -7,10 +7,10 @@
 #include <core/namespace.h>
 
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::details {
 
-struct NOVA_LIB_PORT LogMsgBuffer : LogMsg {
+struct NOVAINFRA_LIB_PORT LogMsgBuffer : LogMsg {
     LogMsgBuffer() = default;
     explicit LogMsgBuffer(const LogMsg &logMsg) : LogMsg(logMsg)
     {
@@ -26,7 +26,7 @@ struct NOVA_LIB_PORT LogMsgBuffer : LogMsg {
         appendSource();
         updateStringView();
     }
-    LogMsgBuffer(LogMsgBuffer &&other) NOVA_NOEXCEPT : LogMsg(other), buffer(std::move(other.buffer))
+    LogMsgBuffer(LogMsgBuffer &&other) NOVAINFRA_NOEXCEPT : LogMsg(other), buffer(std::move(other.buffer))
     {
         updateStringView();
     }
@@ -38,7 +38,7 @@ struct NOVA_LIB_PORT LogMsgBuffer : LogMsg {
         updateStringView();
         return *this;
     }
-    LogMsgBuffer &operator=(LogMsgBuffer &&other) NOVA_NOEXCEPT
+    LogMsgBuffer &operator=(LogMsgBuffer &&other) NOVAINFRA_NOEXCEPT
     {
         LogMsg::operator=(other);
         buffer = std::move(other.buffer);
@@ -74,4 +74,4 @@ struct NOVA_LIB_PORT LogMsgBuffer : LogMsg {
 };
 
 }
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

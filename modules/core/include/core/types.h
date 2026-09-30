@@ -9,7 +9,7 @@
 #include <functional>
 #include <memory>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 using Uint8 = std::uint8_t;
 using Uint16 = std::uint16_t;
 using Uint32 = std::uint32_t;
@@ -23,13 +23,15 @@ using Int64 = std::int64_t;
 using Byte = Uint8;
 using ByteBuffer = std::vector<Byte>;
 
-#if defined(_WIN32) && defined(NOVA_WCHAR_FILENAMES)
+using Size = std::size_t;
+
+#if defined(_WIN32) && defined(NOVAINFRA_WCHAR_FILENAMES)
 using Filename = std::wstring;
-#  define NOVA_FILENAME_INNER(s) L##s
-#  define NOVA_FILENAME(s)       NOVA_FILENAME_INNER(s)
+#  define NOVAINFRA_FILENAME_INNER(s) L##s
+#  define NOVAINFRA_FILENAME(s)       NOVAINFRA_FILENAME_INNER(s)
 #else
 using Filename = std::string;
-#  define NOVA_FILENAME(s) s
+#  define NOVAINFRA_FILENAME(s) s
 #endif
 
 /** @brief Millisecond duration type. */
@@ -68,4 +70,4 @@ constexpr T conditional_static_cast(U value)
 {
     return value;
 }
-NOVA_NAMESPACE_END  // namespace nova
+NOVAINFRA_NAMESPACE_END  // namespace novainfra

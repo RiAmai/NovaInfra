@@ -12,47 +12,47 @@
 #include <string_view>
 #include <vector>
 
-namespace nova_log = nova::log;
+namespace novainfra_log = novainfra::log;
 
 namespace {
 
-std::string_view levelName(nova_log::Level level)
+std::string_view levelName(novainfra_log::Level level)
 {
     switch (level) {
-        case nova_log::Level::TRACE:
+        case novainfra_log::Level::TRACE:
             return "TRACE";
-        case nova_log::Level::DEBUG:
+        case novainfra_log::Level::DEBUG:
             return "DEBUG";
-        case nova_log::Level::INFO:
+        case novainfra_log::Level::INFO:
             return "INFO";
-        case nova_log::Level::WARN:
+        case novainfra_log::Level::WARN:
             return "WARN";
-        case nova_log::Level::ERROR:
+        case novainfra_log::Level::ERROR:
             return "ERROR";
-        case nova_log::Level::CRITICAL:
+        case novainfra_log::Level::CRITICAL:
             return "CRITICAL";
-        case nova_log::Level::OFF:
+        case novainfra_log::Level::OFF:
             return "OFF";
     }
     return "UNKNOWN";
 }
 
-class KeyValueFormatter final : public nova::log::formatters::IFormatter
+class KeyValueFormatter NOVAINFRA_FINAL : public novainfra::log::formatters::IFormatter
 {
 public:
-    void format(const nova_log::LogMsg &msg, std::string &dst) override
+    void format(const novainfra_log::LogMsg &msg, std::string &dst) NOVAINFRA_OVERRIDE
     {
         fmt::format_to(std::back_inserter(dst), "level={} logger={} tid={} message={}\n",
                        levelName(msg.level), msg.loggerName, msg.threadId, msg.message);
     }
 
-    std::unique_ptr<nova::log::formatters::IFormatter> clone() const override
+    std::unique_ptr<novainfra::log::formatters::IFormatter> clone() const NOVAINFRA_OVERRIDE
     {
         return std::make_unique<KeyValueFormatter>();
     }
 };
 
-class MemorySink final : public nova::log::sinks::BaseSink<std::mutex>
+class MemorySink NOVAINFRA_FINAL : public novainfra::log::sinks::BaseSink<std::mutex>
 {
 public:
     std::vector<std::string> records() const
@@ -68,8 +68,8 @@ public:
     }
 
 private:
-    void _log(const nova_log::LogMsg &msg) override { records_.push_back(formatMessage(msg)); }
-    void _flush() override { ++flushCount_; }
+    void _log(const novainfra_log::LogMsg &msg) NOVAINFRA_OVERRIDE { records_.push_back(formatMessage(msg)); }
+    void _flush() NOVAINFRA_OVERRIDE { ++flushCount_; }
 
     std::vector<std::string> records_;
     std::size_t flushCount_{0};
@@ -81,9 +81,10 @@ int main()
 {
     auto allMessages = std::make_shared<MemorySink>();
     auto warningsOnly = std::make_shared<MemorySink>();
-    warningsOnly->setLevel(nova_log::Level::WARN);
+    warningsOnly->setLevel(novainfra_log::Level::WARN);
 
-    nova_log::Logger logger("CustomExtension", nova::log::sinks::SinkInitList{allMessages, warningsOnly});
+    novainfra_log::Logger logger("CustomExtension",
+                                 novainfra::log::sinks::SinkInitList{allMessages, warningsOnly});
     logger.setFormatter(std::make_unique<KeyValueFormatter>());
     logger.info("request {} accepted", 17);
     logger.warn("request {} is slow", 18);

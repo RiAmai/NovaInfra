@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <functional>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::sinks {
 
 struct FileEventHandlers {
@@ -21,4 +21,4 @@ struct FileEventHandlers {
 };
 
 }  // namespace log::sinks
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

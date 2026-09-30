@@ -9,10 +9,10 @@
 #include <mutex>
 #include <vector>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::details {
 
-class NOVA_LIB_PORT BackTracer
+class NOVAINFRA_LIB_PORT BackTracer
 {
 public:
     BackTracer() = default;
@@ -22,7 +22,7 @@ public:
         enabled_.store(other.enabled_.load(std::memory_order_relaxed), std::memory_order_relaxed);
         messages_ = other.messages_;
     }
-    BackTracer(BackTracer &&other) NOVA_NOEXCEPT
+    BackTracer(BackTracer &&other) NOVAINFRA_NOEXCEPT
     {
         std::lock_guard<std::mutex> lock(other.mutex_);
         enabled_.store(other.enabled_.load(std::memory_order_relaxed), std::memory_order_relaxed);
@@ -39,7 +39,7 @@ public:
         messages_ = other.messages_;
         return *this;
     }
-    BackTracer &operator=(BackTracer &&other) NOVA_NOEXCEPT
+    BackTracer &operator=(BackTracer &&other) NOVAINFRA_NOEXCEPT
     {
         if (this == &other) {
             return *this;
@@ -95,4 +95,4 @@ private:
 };
 
 }  // namespace log::details
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

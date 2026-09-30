@@ -10,54 +10,55 @@
 #include <string>
 #include <vector>
 
-namespace nova_log = nova::log;
+namespace novainfra_log = novainfra::log;
 
 int main()
 {
-    constexpr auto kLogFile = "/tmp/novacore_file_events_example.log";
+    constexpr auto kLogFile = "/tmp/novainfra_file_events_example.log";
     std::vector<std::string> events;
     bool openedFileWasValid = false;
 
-    nova::log::sinks::FileEventHandlers handlers;
-    handlers.beforeOpen = [&](const nova::Filename &filename) {
+    novainfra::log::sinks::FileEventHandlers handlers;
+    handlers.beforeOpen = [&](const novainfra::Filename &filename) {
         events.push_back("beforeOpen");
         std::cout << "beforeOpen " << filename << '\n';
     };
-    handlers.afterOpen = [&](const nova::Filename &filename, std::FILE *file) {
+    handlers.afterOpen = [&](const novainfra::Filename &filename, std::FILE *file) {
         events.push_back("afterOpen");
         openedFileWasValid = file != nullptr;
         std::cout << "afterOpen " << filename << '\n';
     };
-    handlers.beforeClose = [&](const nova::Filename &filename, std::FILE *file) {
+    handlers.beforeClose = [&](const novainfra::Filename &filename, std::FILE *file) {
         events.push_back("beforeClose");
         openedFileWasValid = openedFileWasValid && file != nullptr;
         std::cout << "beforeClose " << filename << '\n';
     };
-    handlers.afterClose = [&](const nova::Filename &filename) {
+    handlers.afterClose = [&](const novainfra::Filename &filename) {
         events.push_back("afterClose");
         std::cout << "afterClose " << filename << '\n';
     };
 
     {
-        auto sink = std::make_shared<nova::log::sinks::BasicFileSink<std::mutex>>(kLogFile, true, handlers);
+        auto sink =
+            std::make_shared<novainfra::log::sinks::BasicFileSink<std::mutex>>(kLogFile, true, handlers);
         sink->setPattern("%v");
-        nova_log::Logger logger("FileEvents", sink);
+        novainfra_log::Logger logger("FileEvents", sink);
         logger.info("file event callbacks");
         logger.flush();
     }
 
     const std::vector<std::string> expectedEvents{"beforeOpen", "afterOpen", "beforeClose", "afterClose"};
     const bool callbacksValid =
-        openedFileWasValid && events == expectedEvents && nova::core::PathExists(kLogFile);
+        openedFileWasValid && events == expectedEvents && novainfra::core::PathExists(kLogFile);
     std::cout.flush();
 
     bool errorReported = true;
-#ifndef NOVA_NO_EXCEPTIONS
-    if (nova::core::PathExists("/dev/full")) {
+#ifndef NOVAINFRA_NO_EXCEPTIONS
+    if (novainfra::core::PathExists("/dev/full")) {
         errorReported = false;
-        auto sink = std::make_shared<nova::log::sinks::BasicFileSink<std::mutex>>("/dev/full");
+        auto sink = std::make_shared<novainfra::log::sinks::BasicFileSink<std::mutex>>("/dev/full");
         sink->setPattern("%v");
-        nova_log::Logger logger("FileFailure", sink);
+        novainfra_log::Logger logger("FileFailure", sink);
         logger.setErrHandler([&](const std::string &message) {
             errorReported = true;
             std::cerr << "error handler: " << message << '\n';

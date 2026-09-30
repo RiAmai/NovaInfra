@@ -7,7 +7,7 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
             "generator": "Ninja",
             "cacheVariables": {
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/novacore",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/novainfra",
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
             }
@@ -18,7 +18,7 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
             "generator": "Ninja",
             "cacheVariables": {
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/novacore",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/novainfra",
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
             }
@@ -27,11 +27,13 @@
     "buildPresets": [
         {
             "name": "build-linux-ninja-debug",
-            "configurePreset": "linux-ninja-debug"
+            "configurePreset": "linux-ninja-debug",
+            "jobs": 3
         },
         {
             "name": "build-linux-ninja-release",
-            "configurePreset": "linux-ninja-release"
+            "configurePreset": "linux-ninja-release",
+            "jobs": 3
         }
     ]
 }

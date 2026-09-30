@@ -16,14 +16,14 @@
 
 namespace {
 
-using RotatingSink = nova::log::sinks::RotatingFileSink<std::mutex>;
+using RotatingSink = novainfra::log::sinks::RotatingFileSink<std::mutex>;
 
 class ScopedTempDirectory
 {
 public:
     ScopedTempDirectory()
         : path_(std::filesystem::temp_directory_path() /
-                ("novacore_rotating_tests_" + std::to_string(nova::core::Pid()) + "_" +
+                ("novainfra_rotating_tests_" + std::to_string(novainfra::core::Pid()) + "_" +
                  std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
     {
         std::filesystem::create_directories(path_);
@@ -72,7 +72,7 @@ TEST(RotatingFileSink, RuntimeLimitsAreValidatedAndSynchronized)
     const auto path = tempDirectory.path() / "runtime-limits.log";
     auto sink = std::make_shared<RotatingSink>(path.string(), 1024 * 1024, 2);
     sink->setPattern("%v");
-    nova::log::Logger logger("rotate-test", sink);
+    novainfra::log::Logger logger("rotate-test", sink);
 
     EXPECT_THROW(sink->setMaxSize(0), std::invalid_argument);
     EXPECT_THROW(sink->setMaxFileNum(RotatingSink::kMaxFileNum + 1), std::invalid_argument);
@@ -104,7 +104,7 @@ TEST(RotatingFileSink, RotatesBeforeOverflowAndKeepsConfiguredHistory)
     const auto path = tempDirectory.path() / "app.log";
     auto sink = std::make_shared<RotatingSink>(path.string(), 10, 3);
     sink->setPattern("%v");
-    nova::log::Logger logger("rotate-test", sink);
+    novainfra::log::Logger logger("rotate-test", sink);
 
     for (int index = 0; index < 10; ++index) {
         logger.info("{:04d}", index);
@@ -124,7 +124,7 @@ TEST(RotatingFileSink, RotateNowResetsCurrentSize)
     const auto path = tempDirectory.path() / "app.log";
     auto sink = std::make_shared<RotatingSink>(path.string(), 10, 2);
     sink->setPattern("%v");
-    nova::log::Logger logger("rotate-test", sink);
+    novainfra::log::Logger logger("rotate-test", sink);
 
     logger.info("aaaa");
     sink->rotateNow();
@@ -149,7 +149,7 @@ TEST(RotatingFileSink, RotateOnOpenArchivesExistingFile)
     {
         auto sink = std::make_shared<RotatingSink>(path.string(), 100, 2, true);
         sink->setPattern("%v");
-        nova::log::Logger logger("rotate-test", sink);
+        novainfra::log::Logger logger("rotate-test", sink);
         logger.info("fresh");
         logger.flush();
     }

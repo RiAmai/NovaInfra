@@ -5,7 +5,7 @@
 #include <string_view>
 #include "./namespace.h"
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 inline void AssertFailed(std::string_view expression, std::string_view file, int line,
                          std::string_view message = "")
 {
@@ -17,29 +17,29 @@ inline void AssertFailed(std::string_view expression, std::string_view file, int
     }
     std::abort();
 }
-NOVA_NAMESPACE_END  // namespace nova
+NOVAINFRA_NAMESPACE_END  // namespace novainfra
 
-#if !defined(NDEBUG) || defined(NOVA_ENABLE_ASSERT)
-#  define NOVA_ASSERT(expr)                                                                                  \
+#if !defined(NDEBUG) || defined(NOVAINFRA_ENABLE_ASSERT)
+#  define NOVAINFRA_ASSERT(expr)                                                                             \
       do {                                                                                                   \
           if (!(expr)) {                                                                                     \
-              ::nova::AssertFailed(#expr, __FILE__, __LINE__);                                               \
+              ::novainfra::AssertFailed(#expr, __FILE__, __LINE__);                                          \
           }                                                                                                  \
       } while (0)
 
-#  define NOVA_ASSERT_MSG(expr, msg)                                                                         \
+#  define NOVAINFRA_ASSERT_MSG(expr, msg)                                                                    \
       do {                                                                                                   \
           if (!(expr)) {                                                                                     \
-              ::nova::AssertFailed(#expr, __FILE__, __LINE__, msg);                                          \
+              ::novainfra::AssertFailed(#expr, __FILE__, __LINE__, msg);                                     \
           }                                                                                                  \
       } while (0)
 
 #else
-#  define NOVA_ASSERT(expr)                                                                                  \
+#  define NOVAINFRA_ASSERT(expr)                                                                             \
       do {                                                                                                   \
           (void)sizeof(expr);                                                                                \
       } while (0)
-#  define NOVA_ASSERT_MSG(expr, msg)                                                                         \
+#  define NOVAINFRA_ASSERT_MSG(expr, msg)                                                                    \
       do {                                                                                                   \
           (void)sizeof(expr);                                                                                \
           (void)sizeof(msg);                                                                                 \

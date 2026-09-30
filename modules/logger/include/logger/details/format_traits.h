@@ -8,7 +8,7 @@
 
 #include <type_traits>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::details {
 
 template <class T>
@@ -30,4 +30,4 @@ struct IsConvertibleToAnyFormatString
 };
 
 }  // namespace log::details
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

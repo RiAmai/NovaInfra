@@ -8,7 +8,7 @@
 
 #include <vector>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::formatters {
 
 enum class PatternTimeType {
@@ -16,17 +16,17 @@ enum class PatternTimeType {
     UTC,
 };
 
-class NOVA_LIB_PORT PatternFormatter final : public IFormatter
+class NOVAINFRA_LIB_PORT PatternFormatter NOVAINFRA_FINAL : public IFormatter
 {
 public:
     explicit PatternFormatter(PatternTimeType timeType = PatternTimeType::LOCAL,
                               std::string eol = core::kDefaultEol);
     explicit PatternFormatter(std::string pattern, PatternTimeType timeType = PatternTimeType::LOCAL,
                               std::string eol = core::kDefaultEol);
-    NOVA_DISABLE_COPY(PatternFormatter)
+    NOVAINFRA_DISABLE_COPY(PatternFormatter)
 
-    void format(const details::LogMsg &msg, std::string &dst) override;
-    std::unique_ptr<IFormatter> clone() const override;
+    void format(const details::LogMsg &msg, std::string &dst) NOVAINFRA_OVERRIDE;
+    std::unique_ptr<IFormatter> clone() const NOVAINFRA_OVERRIDE;
     void setPattern(std::string pattern);
 
 private:
@@ -124,4 +124,4 @@ private:
     std::string eol_;
 };
 }  // namespace log::formatters
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

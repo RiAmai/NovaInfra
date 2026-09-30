@@ -24,7 +24,7 @@
 #include <mutex>
 #include <stdexcept>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 
 template <typename T>
 class MpmcBlockingQueue
@@ -218,7 +218,7 @@ private:
     static size_t validateCapacity(size_t maxItems)
     {
         if (maxItems == 0 || maxItems == std::numeric_limits<size_t>::max()) {
-            NOVA_THROW(
+            NOVAINFRA_THROW(
                 std::invalid_argument("MpmcBlockingQueue capacity must be between 1 and SIZE_MAX - 1"));
         }
         return maxItems;
@@ -231,4 +231,4 @@ private:
     std::atomic<size_t> discardCounter_{0};
 };
 
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

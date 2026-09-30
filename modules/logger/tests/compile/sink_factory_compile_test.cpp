@@ -6,18 +6,18 @@
 
 int main()
 {
-    auto *basicFactory = &nova::log::factories::createBasicFileLoggerMt<>;
-    auto *rotatingFactory = &nova::log::factories::createRotatingFileLoggerMt<>;
+    auto *basicFactory = &novainfra::log::factories::createBasicFileLoggerMt<>;
+    auto *rotatingFactory = &novainfra::log::factories::createRotatingFileLoggerMt<>;
     auto *asyncConsoleFactory =
-        &nova::log::factories::createConsoleLoggerMt<nova::log::factories::AsyncFactory>;
-    auto *asyncBasicFactory =
-        &nova::log::factories::createBasicFileLoggerMt<nova::log::factories::AsyncOverrunOldestFactory>;
-    auto *asyncRotatingFactory =
-        &nova::log::factories::createRotatingFileLoggerMt<nova::log::factories::AsyncDiscardNewFactory>;
-    NOVA_UNUSED(basicFactory);
-    NOVA_UNUSED(rotatingFactory);
-    NOVA_UNUSED(asyncConsoleFactory);
-    NOVA_UNUSED(asyncBasicFactory);
-    NOVA_UNUSED(asyncRotatingFactory);
+        &novainfra::log::factories::createConsoleLoggerMt<novainfra::log::factories::AsyncFactory>;
+    auto *asyncBasicFactory = &novainfra::log::factories::createBasicFileLoggerMt<
+        novainfra::log::factories::AsyncOverrunOldestFactory>;
+    auto *asyncRotatingFactory = &novainfra::log::factories::createRotatingFileLoggerMt<
+        novainfra::log::factories::AsyncDiscardNewFactory>;
+    NOVAINFRA_UNUSED(basicFactory);
+    NOVAINFRA_UNUSED(rotatingFactory);
+    NOVAINFRA_UNUSED(asyncConsoleFactory);
+    NOVAINFRA_UNUSED(asyncBasicFactory);
+    NOVAINFRA_UNUSED(asyncRotatingFactory);
     return 0;
 }

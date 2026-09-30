@@ -5,16 +5,16 @@
 #include <core/macros.h>
 #include <logger/sinks/file_event_handlers.h>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::details {
 
-class NOVA_LIB_PORT FileAssistant
+class NOVAINFRA_LIB_PORT FileAssistant
 {
 public:
     FileAssistant() = default;
     explicit FileAssistant(const sinks::FileEventHandlers &eventHandlers) : eventHandlers_(eventHandlers) {}
-    NOVA_DISABLE_COPY(FileAssistant)
-    ~FileAssistant() noexcept;
+    NOVAINFRA_DISABLE_COPY(FileAssistant)
+    ~FileAssistant() NOVAINFRA_NOEXCEPT;
 
     void open(const Filename &fname, bool truncate = false);
     void reopen(bool truncate);
@@ -29,7 +29,7 @@ public:
 
 private:
     void ensureOpen(const char *operation) const;
-    void closeNoThrow() noexcept;
+    void closeNoThrow() NOVAINFRA_NOEXCEPT;
 
     const int openTries_ = 5;
     const unsigned int openInterval_ = 10;
@@ -39,4 +39,4 @@ private:
 };
 
 }  // namespace log::details
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

@@ -16,12 +16,12 @@
 #include <unordered_map>
 #include <vector>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::async {
 
 class AsyncLogger;
 
-class NOVA_LIB_PORT AsyncLogThreadPool
+class NOVAINFRA_LIB_PORT AsyncLogThreadPool
 {
 public:
     using Callback = std::function<void()>;
@@ -31,16 +31,16 @@ public:
     AsyncLogThreadPool(std::size_t queueMaxItems, std::size_t threadMaxNum, Callback onStartFunc);
     AsyncLogThreadPool(std::size_t queueMaxItems, std::size_t threadMaxNum);
 
-    ~AsyncLogThreadPool() noexcept;
+    ~AsyncLogThreadPool() NOVAINFRA_NOEXCEPT;
 
-    NOVA_DISABLE_COPY_MOVE(AsyncLogThreadPool)
+    NOVAINFRA_DISABLE_COPY_MOVE(AsyncLogThreadPool)
 
     std::size_t overrunCounter();
     void resetOverrunCounter();
     std::size_t discardCounter() const;
     void resetDiscardCounter();
     std::size_t queueSize();
-    std::size_t threadCount() const noexcept { return workerPool_.size(); }
+    std::size_t threadCount() const NOVAINFRA_NOEXCEPT { return workerPool_.size(); }
 
 private:
     friend class AsyncLogger;
@@ -57,15 +57,15 @@ private:
                  AsyncOverflowPolicy policy);
     void postFlush(std::shared_ptr<AsyncLogger> &&logger);
     void postAsyncMsg(details::AsyncLogMsg &&newMsg, AsyncOverflowPolicy policy);
-    void workerLoop() noexcept;
+    void workerLoop() NOVAINFRA_NOEXCEPT;
     bool processNextMsg(WorkerContext &context);
-    void flushPendingLoggers(WorkerContext &context) noexcept;
-    void flushLogger(WorkerContext &context, const std::shared_ptr<AsyncLogger> &logger) noexcept;
+    void flushPendingLoggers(WorkerContext &context) NOVAINFRA_NOEXCEPT;
+    void flushLogger(WorkerContext &context, const std::shared_ptr<AsyncLogger> &logger) NOVAINFRA_NOEXCEPT;
     void rememberLogger(const std::shared_ptr<AsyncLogger> &logger);
     void pruneExpiredLoggersLocked();
-    void flushRegisteredLoggers() noexcept;
-    static void invokeCallback(const Callback &callback, const char *phase) noexcept;
-    static void reportWorkerFailure(const char *message) noexcept;
+    void flushRegisteredLoggers() NOVAINFRA_NOEXCEPT;
+    static void invokeCallback(const Callback &callback, const char *phase) NOVAINFRA_NOEXCEPT;
+    static void reportWorkerFailure(const char *message) NOVAINFRA_NOEXCEPT;
 
     QueueType queue_;
     std::vector<std::thread> workerPool_;
@@ -107,4 +107,4 @@ inline std::shared_ptr<AsyncLogThreadPool> asyncLogThreadPool()
 }
 
 }  // namespace log::async
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

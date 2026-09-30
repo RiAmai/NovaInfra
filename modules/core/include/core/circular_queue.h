@@ -14,7 +14,7 @@
 #include <vector>
 
 // circular quque view of std::vector.
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 
 template <typename T>
 class CircularQueue
@@ -41,8 +41,8 @@ public:
 
     // move cannot be default,
     // since we need to reset head_, tail_, etc to zero in the moved object
-    CircularQueue(CircularQueue &&other) NOVA_NOEXCEPT { copyMoveable(std::move(other)); }
-    CircularQueue &operator=(CircularQueue &&other) NOVA_NOEXCEPT
+    CircularQueue(CircularQueue &&other) NOVAINFRA_NOEXCEPT { copyMoveable(std::move(other)); }
+    CircularQueue &operator=(CircularQueue &&other) NOVAINFRA_NOEXCEPT
     {
         copyMoveable(std::move(other));
         return *this;
@@ -113,7 +113,7 @@ public:
 
 private:
     // copy from other&& and reset it to disabled state
-    void copyMoveable(CircularQueue &&other) NOVA_NOEXCEPT
+    void copyMoveable(CircularQueue &&other) NOVAINFRA_NOEXCEPT
     {
         maxItems_ = other.maxItems_;
         head_ = other.head_;
@@ -128,4 +128,4 @@ private:
     }
 };
 
-NOVA_NAMESPACE_END  // namespace nova
+NOVAINFRA_NAMESPACE_END  // namespace novainfra

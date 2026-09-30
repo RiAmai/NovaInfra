@@ -8,18 +8,18 @@
 #include <mutex>
 #include <string>
 
-namespace nova_log = nova::log;
+namespace novainfra_log = novainfra::log;
 
 int main()
 {
-    constexpr auto kLogFile = "/tmp/novacore_rotating_example.log";
+    constexpr auto kLogFile = "/tmp/novainfra_rotating_example.log";
     constexpr std::size_t kMaxFileSize = 128;
     constexpr std::size_t kMaxHistoryFiles = 3;
-    using RotatingSink = nova::log::sinks::RotatingFileSink<std::mutex>;
+    using RotatingSink = novainfra::log::sinks::RotatingFileSink<std::mutex>;
 
     for (std::size_t index = 0; index <= kMaxHistoryFiles; ++index) {
         const auto filename = RotatingSink::calcFilename(kLogFile, index);
-        if (nova::core::RemoveIfExists(filename) != 0) {
+        if (novainfra::core::RemoveIfExists(filename) != 0) {
             std::cerr << "Failed removing old example log: " << filename << '\n';
             return 1;
         }
@@ -28,7 +28,7 @@ int main()
     {
         auto sink = std::make_shared<RotatingSink>(kLogFile, kMaxFileSize, kMaxHistoryFiles);
         sink->setPattern("[%l] %v");
-        nova_log::Logger logger("RotatingExample", sink);
+        novainfra_log::Logger logger("RotatingExample", sink);
         const std::string payload(40, 'x');
 
         for (int index = 0; index < 12; ++index) {
@@ -40,7 +40,7 @@ int main()
     std::cout << "Rotating log files:\n";
     for (std::size_t index = 0; index <= kMaxHistoryFiles; ++index) {
         const auto filename = RotatingSink::calcFilename(kLogFile, index);
-        if (nova::core::PathExists(filename)) {
+        if (novainfra::core::PathExists(filename)) {
             std::cout << filename << " (" << std::filesystem::file_size(filename) << " bytes)\n";
         }
     }

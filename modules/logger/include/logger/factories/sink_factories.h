@@ -11,25 +11,25 @@
 #include <memory>
 #include <string>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::factories {
 
 // console
 template <typename Factory = SynchronousFactory>
-NOVA_INLINE std::shared_ptr<Logger> createConsoleLoggerMt(const std::string &loggerName)
+NOVAINFRA_INLINE std::shared_ptr<Logger> createConsoleLoggerMt(const std::string &loggerName)
 {
     return Factory::template create<sinks::ConsoleOutSinkMt>(loggerName);
 }
 
 template <typename Factory = SynchronousFactory>
-NOVA_INLINE std::shared_ptr<Logger> createConsoleLoggerSt(const std::string &loggerName)
+NOVAINFRA_INLINE std::shared_ptr<Logger> createConsoleLoggerSt(const std::string &loggerName)
 {
     return Factory::template create<sinks::ConsoleOutSinkSt>(loggerName);
 }
 
 // basic file
 template <typename Factory = SynchronousFactory>
-NOVA_INLINE std::shared_ptr<Logger>
+NOVAINFRA_INLINE std::shared_ptr<Logger>
     createBasicFileLoggerMt(const std::string &loggerName, const Filename &filename, bool truncate = false,
                             const sinks::FileEventHandlers &eventHandlers = {})
 {
@@ -37,7 +37,7 @@ NOVA_INLINE std::shared_ptr<Logger>
 }
 
 template <typename Factory = SynchronousFactory>
-NOVA_INLINE std::shared_ptr<Logger>
+NOVAINFRA_INLINE std::shared_ptr<Logger>
     createBasicFileLoggerSt(const std::string &loggerName, const Filename &filename, bool truncate = false,
                             const sinks::FileEventHandlers &eventHandlers = {})
 {
@@ -46,7 +46,7 @@ NOVA_INLINE std::shared_ptr<Logger>
 
 // rotating file
 template <typename Factory = SynchronousFactory>
-NOVA_INLINE std::shared_ptr<Logger>
+NOVAINFRA_INLINE std::shared_ptr<Logger>
     createRotatingFileLoggerMt(const std::string &loggerName, const Filename &filename, std::size_t maxSize,
                                std::size_t maxFileNum, bool rotateOnOpen = false,
                                const sinks::FileEventHandlers &eventHandlers = {})
@@ -56,7 +56,7 @@ NOVA_INLINE std::shared_ptr<Logger>
 }
 
 template <typename Factory = SynchronousFactory>
-NOVA_INLINE std::shared_ptr<Logger>
+NOVAINFRA_INLINE std::shared_ptr<Logger>
     createRotatingFileLoggerSt(const std::string &loggerName, const Filename &filename, std::size_t maxSize,
                                std::size_t maxFileNum, bool rotateOnOpen = false,
                                const sinks::FileEventHandlers &eventHandlers = {})
@@ -66,4 +66,4 @@ NOVA_INLINE std::shared_ptr<Logger>
 }
 
 }  // namespace log::factories
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

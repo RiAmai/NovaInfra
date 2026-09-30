@@ -2,7 +2,7 @@
 
 #include <core/namespace.h>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::async {
 
 enum class AsyncOverflowPolicy {
@@ -12,4 +12,4 @@ enum class AsyncOverflowPolicy {
 };
 
 }  // namespace log::async
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

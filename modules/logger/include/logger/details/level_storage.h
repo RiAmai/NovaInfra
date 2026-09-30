@@ -4,10 +4,10 @@
 
 #include <atomic>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::details {
 
 using LevelType = std::atomic<int>;
 
 }  // namespace log::details
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

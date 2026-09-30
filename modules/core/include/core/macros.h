@@ -4,86 +4,102 @@
 #include <cstdlib>
 #include <exception>
 
-#if defined(NOVA_LOG_NO_EXCEPTIONS) && !defined(NOVA_NO_EXCEPTIONS)
-#  define NOVA_NO_EXCEPTIONS
+#if defined(NOVAINFRA_LOG_NO_EXCEPTIONS) && !defined(NOVAINFRA_NO_EXCEPTIONS)
+#  define NOVAINFRA_NO_EXCEPTIONS
 #endif
 
-#ifndef NOVA_INLINE
-#  define NOVA_INLINE inline
+#ifndef NOVAINFRA_INLINE
+#  define NOVAINFRA_INLINE inline
 #endif
 
-#ifndef NOVA_NOEXCEPT
-#  define NOVA_NOEXCEPT noexcept
+#ifndef NOVAINFRA_NOEXCEPT
+#  define NOVAINFRA_NOEXCEPT noexcept
 #endif
 
-#ifndef NOVA_CONSTEXPR
-#  define NOVA_CONSTEXPR constexpr
+#ifndef NOVAINFRA_FINAL
+#  define NOVAINFRA_FINAL final
 #endif
 
-#ifndef NOVA_UNUSED
-#  define NOVA_UNUSED(x) (void)(x)
+#ifndef NOVAINFRA_OVERRIDE
+#  define NOVAINFRA_OVERRIDE override
 #endif
 
-#ifndef NOVA_STRINGIFY_HELPER
-#  define NOVA_STRINGIFY_HELPER(x) #x
+#ifndef NOVAINFRA_CONSTEXPR
+#  define NOVAINFRA_CONSTEXPR constexpr
 #endif
 
-#ifndef NOVA_STRINGIFY
-#  define NOVA_STRINGIFY(x) NOVA_STRINGIFY_HELPER(x)
+#ifndef NOVAINFRA_UNUSED
+#  define NOVAINFRA_UNUSED(x) (void)(x)
 #endif
 
-#ifndef NOVA_CONCAT_HELPER
-#  define NOVA_CONCAT_HELPER(a, b) a##b
+#ifndef NOVAINFRA_STRINGIFY_HELPER
+#  define NOVAINFRA_STRINGIFY_HELPER(x) #x
 #endif
 
-#ifndef NOVA_CONCAT
-#  define NOVA_CONCAT(a, b) NOVA_CONCAT_HELPER(a, b)
+#ifndef NOVAINFRA_STRINGIFY
+#  define NOVAINFRA_STRINGIFY(x) NOVAINFRA_STRINGIFY_HELPER(x)
 #endif
 
-#ifndef NOVA_DISABLE_COPY
-#  define NOVA_DISABLE_COPY(Class)                                                                           \
+#ifndef NOVAINFRA_CONCAT_HELPER
+#  define NOVAINFRA_CONCAT_HELPER(a, b) a##b
+#endif
+
+#ifndef NOVAINFRA_CONCAT
+#  define NOVAINFRA_CONCAT(a, b) NOVAINFRA_CONCAT_HELPER(a, b)
+#endif
+
+#ifndef NOVAINFRA_DISABLE_COPY
+#  define NOVAINFRA_DISABLE_COPY(Class)                                                                      \
       Class(const Class &) = delete;                                                                         \
       Class &operator=(const Class &) = delete;
 #endif
 
-#ifndef NOVA_DISABLE_MOVE
-#  define NOVA_DISABLE_MOVE(Class)                                                                           \
+#ifndef NOVAINFRA_DISABLE_MOVE
+#  define NOVAINFRA_DISABLE_MOVE(Class)                                                                      \
       Class(Class &&) = delete;                                                                              \
       Class &operator=(Class &&) = delete;
 #endif
 
-#ifndef NOVA_DISABLE_COPY_MOVE
-#  define NOVA_DISABLE_COPY_MOVE(Class)                                                                      \
-      NOVA_DISABLE_COPY(Class)                                                                               \
-      NOVA_DISABLE_MOVE(Class)
+#ifndef NOVAINFRA_DISABLE_COPY_MOVE
+#  define NOVAINFRA_DISABLE_COPY_MOVE(Class)                                                                 \
+      NOVAINFRA_DISABLE_COPY(Class)                                                                          \
+      NOVAINFRA_DISABLE_MOVE(Class)
 #endif
 
 // Exception syntax is centralized here. Handler bodies are removed entirely
 // when exceptions are disabled, so call sites stay valid under -fno-exceptions.
-#ifdef NOVA_NO_EXCEPTIONS
-#  define NOVA_TRY
-#  define NOVA_THROW(ex)                                                                                     \
+#ifdef NOVAINFRA_NO_EXCEPTIONS
+#  define NOVAINFRA_TRY
+#  define NOVAINFRA_THROW(ex)                                                                                \
       do {                                                                                                   \
-          const auto &novaException = (ex);                                                                  \
-          std::fprintf(stderr, "nova fatal error: %s\n", novaException.what());                              \
+          const auto &novainfraException = (ex);                                                             \
+          std::fprintf(stderr, "novainfra fatal error: %s\n", novainfraException.what());                    \
           std::abort();                                                                                      \
       } while (0)
-#  define NOVA_CATCH_STD
-#  define NOVA_CATCH_STD_BODY(...)
-#  define NOVA_CATCH_ALL_BODY(...)
-#  define NOVA_RETHROW_CURRENT() std::terminate()
-#  define NOVA_RETHROW_EXCEPTION(exceptionPtr)                                                               \
+#  define NOVAINFRA_CATCH_STD
+#  define NOVAINFRA_CATCH_STD_BODY(...)
+#  define NOVAINFRA_CATCH_ALL_BODY(...)
+#  define NOVAINFRA_RETHROW_CURRENT() std::terminate()
+#  define NOVAINFRA_RETHROW_EXCEPTION(exceptionPtr)                                                          \
       do {                                                                                                   \
-          NOVA_UNUSED(exceptionPtr);                                                                         \
+          NOVAINFRA_UNUSED(exceptionPtr);                                                                    \
           std::terminate();                                                                                  \
       } while (0)
 #else
-#  define NOVA_TRY       try
-#  define NOVA_THROW(ex) throw(ex)
-#  define NOVA_CATCH_STD                                                                                     \
+#  define NOVAINFRA_TRY       try
+#  define NOVAINFRA_THROW(ex) throw(ex)
+#  define NOVAINFRA_CATCH_STD                                                                                \
       catch (const std::exception &) {}
-#  define NOVA_CATCH_STD_BODY(...) catch (const std::exception &ex) { __VA_ARGS__ }
-#  define NOVA_CATCH_ALL_BODY(...) catch (...) { __VA_ARGS__ }
-#  define NOVA_RETHROW_CURRENT() throw
-#  define NOVA_RETHROW_EXCEPTION(exceptionPtr) std::rethrow_exception(exceptionPtr)
+#  define NOVAINFRA_CATCH_STD_BODY(...)                                                                      \
+      catch (const std::exception &ex)                                                                       \
+      {                                                                                                      \
+          __VA_ARGS__                                                                                        \
+      }
+#  define NOVAINFRA_CATCH_ALL_BODY(...)                                                                      \
+      catch (...)                                                                                            \
+      {                                                                                                      \
+          __VA_ARGS__                                                                                        \
+      }
+#  define NOVAINFRA_RETHROW_CURRENT()               throw
+#  define NOVAINFRA_RETHROW_EXCEPTION(exceptionPtr) std::rethrow_exception(exceptionPtr)
 #endif

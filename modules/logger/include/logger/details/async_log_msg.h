@@ -10,7 +10,7 @@
 #include <string>
 #include <utility>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::async {
 class AsyncLogger;
 }
@@ -40,9 +40,9 @@ struct AsyncLogMsg : LogMsg {
 
     explicit AsyncLogMsg(AsyncMsgType type) : AsyncLogMsg{nullptr, type} {}
 
-    AsyncLogMsg(AsyncLogMsg &&other) noexcept { *this = std::move(other); }
+    AsyncLogMsg(AsyncLogMsg &&other) NOVAINFRA_NOEXCEPT { *this = std::move(other); }
 
-    AsyncLogMsg &operator=(AsyncLogMsg &&other) noexcept
+    AsyncLogMsg &operator=(AsyncLogMsg &&other) NOVAINFRA_NOEXCEPT
     {
         if (this == &other) {
             return *this;
@@ -113,4 +113,4 @@ private:
 };
 
 }  // namespace log::details
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

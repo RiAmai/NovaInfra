@@ -7,7 +7,7 @@
 #include <string>
 #include <utility>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::factories {
 
 struct SynchronousFactory {
@@ -22,4 +22,4 @@ struct SynchronousFactory {
 };
 
 }  // namespace log::factories
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

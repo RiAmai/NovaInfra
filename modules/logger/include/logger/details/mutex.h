@@ -5,7 +5,7 @@
 #include <mutex>
 #include <type_traits>
 
-NOVA_NAMESPACE_BEGIN
+NOVAINFRA_NAMESPACE_BEGIN
 namespace log::details {
 
 struct NullMutex {
@@ -52,4 +52,4 @@ struct ConsoleMutexTraits<MutexPolicy, std::void_t<typename MutexPolicy::Mutex>>
 };
 
 }  // namespace log::details
-NOVA_NAMESPACE_END
+NOVAINFRA_NAMESPACE_END

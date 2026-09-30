@@ -9,8 +9,8 @@
 
 TEST(ConsoleOutSink, RoutesLevelsToExpectedStreams)
 {
-    auto sink = std::make_shared<nova::log::sinks::ConsoleOutSink<std::mutex>>();
-    nova::log::Logger logger("console", sink);
+    auto sink = std::make_shared<novainfra::log::sinks::ConsoleOutSink<std::mutex>>();
+    novainfra::log::Logger logger("console", sink);
 
     testing::internal::CaptureStdout();
     testing::internal::CaptureStderr();
