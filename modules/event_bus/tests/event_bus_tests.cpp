@@ -189,3 +189,105 @@ TEST(EventBus, NestedCrossBusDrainShutdownFailsFast)
     busA.shutdown();
     busB.shutdown();
 }
+
+TEST(EventBus, DiscardAndExecutorRejectionReleasePayloadOutsideMutex)
+{
+    for (bool reject : {false, true}) {
+        EventBusOptions options;
+        options.executor = [reject](auto) { return !reject; };
+        EventBus bus(options);
+        bool released = false;
+        auto subscription = bus.subscribe<std::shared_ptr<int>>([](const auto &) {});
+        auto payload = std::shared_ptr<int>(new int(1), [&](int *p) {
+            (void)bus.stats();
+            released = true;
+            delete p;
+        });
+        bus.publishAsync(std::move(payload));
+        bus.shutdown(ShutdownMode::DISCARD);
+        EXPECT_TRUE(released);
+    }
+}
+
+TEST(EventBus, PruningCancelledCallbackReleasesCaptureOutsideMutex)
+{
+    EventBus bus;
+    bool released = false;
+    auto payload = std::shared_ptr<int>(new int(1), [&](int *p) {
+        (void)bus.stats();
+        released = true;
+        delete p;
+    });
+    auto subscription = bus.subscribe<Number>([payload = std::move(payload)](const auto &) {});
+    subscription.cancel();
+    bus.publish(Number{});
+    EXPECT_TRUE(released);
+}
+
+TEST(EventBus, ConsecutiveAsyncPayloadCleanupCanReenterStats)
+{
+    std::function<void()> drain;
+    EventBusOptions options;
+    options.executor = [&](auto task) {
+        drain = std::move(task);
+        return true;
+    };
+    EventBus bus(options);
+    int released = 0;
+    auto subscription = bus.subscribe<std::shared_ptr<int>>([](const auto &) {});
+    for (int i = 0; i < 2; ++i) {
+        bus.publishAsync(std::shared_ptr<int>(new int(i), [&](int *p) {
+            (void)bus.stats();
+            ++released;
+            delete p;
+        }));
+    }
+    drain();
+    EXPECT_EQ(released, 2);
+    EXPECT_EQ(bus.stats().delivered, 2U);
+}
+
+
+TEST(EventBus, SynchronousCallbackMayDestroyOwningBus)
+{
+    auto bus = std::make_unique<EventBus>();
+    int calls = 0;
+    auto first = bus->subscribe<Number>([&](const Number &) { bus.reset(); });
+    auto second = bus->subscribe<Number>([&](const Number &) { ++calls; });
+    const auto report = bus->publish(Number{1});
+    EXPECT_EQ(bus, nullptr);
+    EXPECT_EQ(report.delivered, 2U);
+    EXPECT_EQ(calls, 1);
+}
+
+TEST(EventBus, ErrorHandlerMayDestroyOwningBus)
+{
+    std::unique_ptr<EventBus> bus;
+    EventBusOptions options;
+    options.onError = [&](const auto &) { bus.reset(); };
+    bus = std::make_unique<EventBus>(std::move(options));
+    auto first = bus->subscribe<Number>([](const Number &) { throw std::runtime_error("failure"); });
+    int calls = 0;
+    auto second = bus->subscribe<Number>([&](const Number &) { ++calls; });
+    const auto report = bus->publish(Number{1});
+    EXPECT_EQ(bus, nullptr);
+    EXPECT_EQ(report.failed, 1U);
+    EXPECT_EQ(report.delivered, 1U);
+    EXPECT_EQ(calls, 1);
+}
+
+TEST(EventBus, InlineExecutorCallbackMayDestroyOwningBus)
+{
+    for (bool nonblocking : {false, true}) {
+        EventBusOptions options;
+        options.executor = [](auto task) {
+            task();
+            return false;
+        };
+        auto bus = std::make_unique<EventBus>(std::move(options));
+        auto subscription = bus->subscribe<Number>([&](const Number &) { bus.reset(); });
+        const auto status = nonblocking ? bus->tryPublishAsync(Number{1}) : bus->publishAsync(Number{1});
+        EXPECT_EQ(status, AsyncPublishStatus::EXECUTOR_REJECTED);
+        EXPECT_EQ(bus, nullptr);
+    }
+}

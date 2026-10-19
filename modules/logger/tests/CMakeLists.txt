@@ -30,7 +30,7 @@ target_link_libraries(novainfra_logger_tests
         Threads::Threads
 )
 
-gtest_discover_tests(novainfra_logger_tests DISCOVERY_MODE PRE_TEST)
+gtest_discover_tests(novainfra_logger_tests DISCOVERY_MODE PRE_TEST PROPERTIES TIMEOUT 30)
 
 add_executable(novainfra_logger_backtrace_tests core/backtrace_tests.cpp)
 target_link_libraries(novainfra_logger_backtrace_tests

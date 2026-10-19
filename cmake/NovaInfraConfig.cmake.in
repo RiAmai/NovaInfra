@@ -8,8 +8,39 @@ endif()
 
 if("@MODULES_SQLITE_POOL_ENABLE@")
     find_dependency(Threads)
-    if("@SQLITE_BACKEND@" STREQUAL "plain")
+    if("@NOVAINFRA_SQLITE_DEPENDENCY@" STREQUAL "SQLite3")
         find_dependency(SQLite3)
+    elseif("@NOVAINFRA_SQLITE_DEPENDENCY@" STREQUAL "sqlite-pkg")
+        find_dependency(PkgConfig)
+        pkg_check_modules(PKGSQLITE3 REQUIRED sqlite3)
+        if(NOT TARGET _sqlite3_pkgcfg)
+            add_library(_sqlite3_pkgcfg INTERFACE IMPORTED)
+            set_target_properties(_sqlite3_pkgcfg PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${PKGSQLITE3_INCLUDE_DIRS}"
+                INTERFACE_LINK_LIBRARIES "${PKGSQLITE3_LIBRARIES}"
+                INTERFACE_LINK_DIRECTORIES "${PKGSQLITE3_LIBRARY_DIRS}")
+        endif()
+    elseif("@NOVAINFRA_SQLITE_DEPENDENCY@" STREQUAL "sqlcipher")
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(NovaInfraSQLCipher QUIET IMPORTED_TARGET sqlcipher)
+        endif()
+        if(NOT TARGET NovaInfraSQLiteBackend)
+            add_library(NovaInfraSQLiteBackend INTERFACE IMPORTED)
+            if(TARGET PkgConfig::NovaInfraSQLCipher)
+                set_property(TARGET NovaInfraSQLiteBackend PROPERTY
+                    INTERFACE_LINK_LIBRARIES PkgConfig::NovaInfraSQLCipher)
+            else()
+                find_library(NovaInfra_SQLCipher_LIBRARY NAMES sqlcipher REQUIRED)
+                find_path(NovaInfra_SQLCipher_INCLUDE NAMES sqlite3.h PATH_SUFFIXES sqlcipher REQUIRED)
+                set_target_properties(NovaInfraSQLiteBackend PROPERTIES
+                    INTERFACE_INCLUDE_DIRECTORIES "${NovaInfra_SQLCipher_INCLUDE}"
+                    INTERFACE_LINK_LIBRARIES "${NovaInfra_SQLCipher_LIBRARY}")
+            endif()
+        endif()
+    endif()
+    if("@NOVAINFRA_SQLITE_CRYPTO_DEPENDENCY@" STREQUAL "OpenSSL")
+        find_dependency(OpenSSL COMPONENTS Crypto)
     endif()
 endif()
 

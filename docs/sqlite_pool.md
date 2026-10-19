@@ -79,6 +79,7 @@ int main()
 {
     novainfra::sqlitepool::PoolConfig config;
     config.readConnections = 2;
+    config.pageCacheSize = -2048; // 每个连接最多约 2 MiB page cache，按需分配。
     config.pragmas.emplace_back("foreign_keys=ON");
 
     novainfra::sqlitepool::ConnectionPool pool("notes.db", config);
@@ -223,3 +224,13 @@ try {
 4. 大结果集使用 `step()`，避免一次性构造完整 `RowSet`。
 5. 启用健康检查，并监控 `failed` 和 `replaced` 计数。
 6. 定期在维护窗口调用 `integrityCheck()`、`optimize()` 和 `checkpoint()`。
+
+## 长期运行服务的容量设置
+
+生产环境显式设置 reader 数和每连接 cache。默认 reader 为 `max(hardware_concurrency, 4)`，加上一个 writer；默认 `pageCacheSize=-8000` 的单位是 KiB。64 核机器共 65 个连接，配置的 page cache 预算约 508 MiB，实际按需分配，另有语句、结果集和 mmap 等内存。
+
+健康检查逐个预留空闲读槽位，再在锁外执行 probe、重开连接和 `postOpen`，其他槽位仍可借用或归还。`postOpen` 不应重入 `checkHealth()` 或等待同一预留槽位。
+
+`query()` 的 `RowSet` 会把全部行列物化为字符串；浮点值按 `max_digits10` 输出以保留 double 往返精度，文本形式可能包含指数且不再固定六位小数。大结果优先使用 `prepare()`、`step()` 和 `columnInt64/Double/TextView()` 流式读取；NULL 和空字符串需要用 typed API 的 `columnNull()` 区分。
+
+基准的 `batch-mean p95` 是多次批量平均值的分位数。新增逐次 SELECT 查询测量输出真实操作 P50/P95/P99；这些计时包含时钟和结果物化开销，峰值 RSS 为整个进程的历史最高值。

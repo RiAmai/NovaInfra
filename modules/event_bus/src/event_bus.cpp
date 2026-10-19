@@ -47,6 +47,23 @@ struct State::Impl {
         bool scheduled = false;
     };
 
+    // Retire inactive callbacks outside mutex: captures may reenter the bus.
+    static void prune(std::vector<std::shared_ptr<Slot>> &slots, std::vector<std::shared_ptr<Slot>> &retired)
+    {
+        auto output = slots.begin();
+        for (auto current = slots.begin(); current != slots.end(); ++current) {
+            if (!(*current)->active.load(std::memory_order_acquire)) {
+                retired.push_back(std::move(*current));
+            } else {
+                if (output != current) {
+                    *output = std::move(*current);
+                }
+                ++output;
+            }
+        }
+        slots.erase(output, slots.end());
+    }
+
     explicit Impl(EventBusOptions value) : options(std::move(value))
     {
         if (options.queueCapacity == 0) {
@@ -68,6 +85,7 @@ State::State(EventBusOptions options) : impl_(std::make_shared<Impl>(std::move(o
 
 std::shared_ptr<Slot> State::subscribe(std::type_index type, std::function<void(const void *)> callback)
 {
+    std::vector<std::shared_ptr<Slot>> retired;
     auto slot = std::make_shared<Slot>(0, std::move(callback));
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (!impl_->accepting) {
@@ -78,10 +96,7 @@ std::shared_ptr<Slot> State::subscribe(std::type_index type, std::function<void(
         channel = std::make_shared<Impl::Channel>();
     }
     auto &slots = channel->slots;
-    slots.erase(std::remove_if(
-                    slots.begin(), slots.end(),
-                    [](const auto &existing) { return !existing->active.load(std::memory_order_acquire); }),
-                slots.end());
+    Impl::prune(slots, retired);
     slot->id = impl_->nextId++;
     channel->slots.push_back(slot);
     return slot;
@@ -90,6 +105,7 @@ std::shared_ptr<Slot> State::subscribe(std::type_index type, std::function<void(
 DispatchReport State::publish(std::type_index type, const void *event)
 {
     std::vector<std::shared_ptr<Slot>> slots;
+    std::vector<std::shared_ptr<Slot>> retired;
     {
         std::lock_guard<std::mutex> lock(impl_->mutex);
         if (!impl_->accepting) {
@@ -100,10 +116,7 @@ DispatchReport State::publish(std::type_index type, const void *event)
             return {};
         }
         auto &registered = found->second->slots;
-        registered.erase(
-            std::remove_if(registered.begin(), registered.end(),
-                           [](const auto &slot) { return !slot->active.load(std::memory_order_acquire); }),
-            registered.end());
+        Impl::prune(registered, retired);
         slots = registered;
     }
 
@@ -145,6 +158,8 @@ AsyncPublishStatus State::enqueue(std::type_index type, std::shared_ptr<const vo
 {
     std::shared_ptr<Impl::Channel> channel;
     bool schedule = false;
+    std::vector<std::shared_ptr<Slot>> retired;
+    std::vector<std::shared_ptr<Slot>> slots;
     {
         std::unique_lock<std::mutex> lock(impl_->mutex);
         if (!impl_->accepting) {
@@ -158,11 +173,7 @@ AsyncPublishStatus State::enqueue(std::type_index type, std::shared_ptr<const vo
             entry = std::make_shared<Impl::Channel>();
         }
         channel = entry;
-        std::vector<std::shared_ptr<Slot>> slots;
-        channel->slots.erase(
-            std::remove_if(channel->slots.begin(), channel->slots.end(),
-                           [](const auto &slot) { return !slot->active.load(std::memory_order_acquire); }),
-            channel->slots.end());
+        Impl::prune(channel->slots, retired);
         for (const auto &slot : channel->slots) {
             if (slot->active.load(std::memory_order_acquire)) {
                 slots.push_back(slot);
@@ -223,13 +234,16 @@ AsyncPublishStatus State::enqueue(std::type_index type, std::shared_ptr<const vo
                             state->idle.notify_all();
                             return;
                         }
-                        item = std::move(found->second->queue.front());
+                        item.payload.swap(found->second->queue.front().payload);
+                        item.slots.swap(found->second->queue.front().slots);
                         found->second->queue.pop_front();
                         --state->stats.queued;
                         ++state->stats.active;
                     }
                     state->capacity.notify_all();
 
+                    DispatchScope eventScope(state.get());
+                    DispatchReport report;
                     for (const auto &slot : item.slots) {
                         if (!slot->active.load(std::memory_order_acquire)) {
                             continue;
@@ -238,14 +252,10 @@ AsyncPublishStatus State::enqueue(std::type_index type, std::shared_ptr<const vo
                         NOVAINFRA_TRY
                         {
                             slot->callback(item.payload.get());
-                            std::lock_guard<std::mutex> lock(state->mutex);
-                            ++state->stats.delivered;
+                            ++report.delivered;
                         }
                         NOVAINFRA_CATCH_ALL_BODY({
-                            {
-                                std::lock_guard<std::mutex> lock(state->mutex);
-                                ++state->stats.failed;
-                            }
+                            ++report.failed;
                             CallbackError error{type, slot->id, std::current_exception()};
                             const auto handler = state->options.onError;
                             if (handler) {
@@ -260,8 +270,12 @@ AsyncPublishStatus State::enqueue(std::type_index type, std::shared_ptr<const vo
                             }
                         })
                     }
+                    // Release user resources before reporting idle.
+                    item = {};
                     {
                         std::lock_guard<std::mutex> lock(state->mutex);
+                        state->stats.delivered += report.delivered;
+                        state->stats.failed += report.failed;
                         --state->stats.active;
                         if (state->stats.queued == 0 && state->stats.active == 0) {
                             state->idle.notify_all();
@@ -274,12 +288,13 @@ AsyncPublishStatus State::enqueue(std::type_index type, std::shared_ptr<const vo
     NOVAINFRA_CATCH_ALL_BODY({ accepted = false; })
 
     if (!accepted) {
+        std::deque<Impl::Envelope> retiredQueue;
         std::lock_guard<std::mutex> lock(impl_->mutex);
         auto found = impl_->channels.find(type);
         if (found != impl_->channels.end()) {
             impl_->stats.dropped += found->second->queue.size();
             impl_->stats.queued -= found->second->queue.size();
-            found->second->queue.clear();
+            retiredQueue.swap(found->second->queue);
             found->second->scheduled = false;
         }
         ++impl_->stats.executorFailures;
@@ -295,13 +310,16 @@ void State::shutdown(ShutdownMode mode)
     if (mode == ShutdownMode::DRAIN && DispatchScope::contains(impl_.get())) {
         NOVAINFRA_THROW(std::logic_error("EventBus shutdown cannot drain from a callback"));
     }
+    std::vector<std::deque<Impl::Envelope>> retiredQueues;
     std::unique_lock<std::mutex> lock(impl_->mutex);
     impl_->accepting = false;
     impl_->stats.accepting = false;
     if (mode == ShutdownMode::DISCARD) {
+        retiredQueues.reserve(impl_->channels.size());
         for (auto &entry : impl_->channels) {
             impl_->stats.dropped += entry.second->queue.size();
-            entry.second->queue.clear();
+            retiredQueues.emplace_back();
+            retiredQueues.back().swap(entry.second->queue);
         }
         impl_->stats.queued = 0;
         impl_->capacity.notify_all();
@@ -339,7 +357,8 @@ EventBus::~EventBus() noexcept
 }
 void EventBus::shutdown(ShutdownMode mode)
 {
-    state_->shutdown(mode);
+    const auto state = state_;
+    state->shutdown(mode);
 }
 bool EventBus::accepting() const noexcept
 {

@@ -45,6 +45,7 @@ public:
     bool isSecret(const std::string &path) const;
 
 private:
+    friend class ConfigManager;
     struct Field {
         std::string path;
         Value::Type type;

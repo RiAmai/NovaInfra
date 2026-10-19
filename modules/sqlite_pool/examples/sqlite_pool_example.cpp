@@ -1,5 +1,6 @@
 #include <sqlite_pool/connection_pool.h>
 #include <sqlite_pool/sqlite_error.h>
+#include <core/macros.h>
 
 #include <filesystem>
 #include <iostream>
@@ -8,9 +9,11 @@
 int main(int argc, char **argv)
 {
     const std::string path = argc > 1 ? argv[1] : "sqlite_pool_example.db";
-    try {
+    NOVAINFRA_TRY
+    {
         novainfra::sqlitepool::PoolConfig config;
         config.readConnections = 2;
+        config.pageCacheSize = -2048;  // KiB per connection, allocated on demand.
         config.pragmas.emplace_back("foreign_keys=ON");
         novainfra::sqlitepool::ConnectionPool pool(path, config);
 
@@ -42,10 +45,16 @@ int main(int argc, char **argv)
         pool.checkpoint();
         std::cout << "database: " << std::filesystem::absolute(path) << "\n";
         return 0;
-    } catch (const novainfra::sqlitepool::SqliteError &error) {
+    }
+#ifndef NOVAINFRA_NO_EXCEPTIONS
+    catch (const novainfra::sqlitepool::SqliteError &error)
+    {
         std::cerr << "sqlite error (" << error.code() << "): " << error.what() << '\n';
-    } catch (const std::exception &error) {
+    }
+    catch (const std::exception &error)
+    {
         std::cerr << "error: " << error.what() << '\n';
     }
+#endif
     return 1;
 }

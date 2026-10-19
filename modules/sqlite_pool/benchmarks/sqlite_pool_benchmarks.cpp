@@ -1,6 +1,8 @@
 #include <sqlite_pool/connection_pool.h>
 #include <sqlite_pool/sqlite_error.h>
 
+#include "../../../benchmarks/metrics.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -68,8 +70,8 @@ void PrintResult(const std::string &name, Uint64 operations, const SampleSummary
     const auto p95Ns = summary.p95 * 1'000'000'000.0 / static_cast<double>(operations);
     const auto millionPerSecond = static_cast<double>(operations) / summary.median / 1'000'000.0;
     std::cerr << std::left << std::setw(34) << name << std::right << std::fixed << std::setprecision(2)
-              << std::setw(12) << medianNs << " ns/op" << std::setw(12) << p95Ns << " p95" << std::setw(12)
-              << millionPerSecond << " Mops/s\n";
+              << std::setw(12) << medianNs << " ns/op" << std::setw(12) << p95Ns << " batch-mean p95"
+              << std::setw(12) << millionPerSecond << " Mops/s\n";
 }
 
 template <typename Function>
@@ -252,17 +254,36 @@ double BenchmarkSqliteError(Uint64 operations)
 }
 #endif
 
+void RunQueryLatency(std::size_t count)
+{
+    TempDatabase database;
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolConfig(4));
+    std::vector<double> samples;
+    samples.reserve(count);
+    const auto start = Clock::now();
+    for (std::size_t i = 0; i < count; ++i) {
+        const auto sent = Clock::now();
+        auto rows = pool.read().query("SELECT 1 AS value");
+        if (rows.size() != 1 || rows[0].at("value") != "1")
+            std::abort();
+        samples.push_back(benchmark::microseconds(Clock::now() - sent));
+    }
+    benchmark::report("read lease+prepare+materialize SELECT 1", std::move(samples), Clock::now() - start,
+                      count);
+}
+
 }  // namespace
 
-int main()
+int main(int argc, char **argv)
 {
-    constexpr Uint64 kLeaseOperations = 500'000;
-    constexpr Uint64 kWriteOperations = 50'000;
-    constexpr Uint64 kTransactionOperations = 2'000;
-    constexpr Uint64 kReadRows = 50'000;
-    constexpr Uint64 kConcurrentOperations = 200'000;
+    const Uint64 scale = argc > 1 ? std::max<unsigned long long>(1, std::strtoull(argv[1], nullptr, 10)) : 1;
+    const Uint64 kLeaseOperations = std::max<Uint64>(1, 500'000 / scale);
+    const Uint64 kWriteOperations = std::max<Uint64>(1, 50'000 / scale);
+    const Uint64 kTransactionOperations = std::max<Uint64>(1, 2'000 / scale);
+    const Uint64 kReadRows = std::max<Uint64>(1, 50'000 / scale);
+    const Uint64 kConcurrentOperations = std::max<Uint64>(1, 200'000 / scale);
 #ifndef NOVAINFRA_NO_EXCEPTIONS
-    constexpr Uint64 kErrorOperations = 10'000;
+    const Uint64 kErrorOperations = std::max<Uint64>(1, 10'000 / scale);
 #endif
 
     std::cerr << "Nova sqlite_pool microbenchmarks\n";
@@ -274,6 +295,7 @@ int main()
 #endif
     std::cerr << "  samples: " << kMeasuredSamples << " measured after one warmup\n\n";
 
+    RunQueryLatency(10000);
     RunBenchmark("read connection lease", kLeaseOperations, BenchmarkReadLease);
     RunBenchmark("prepared insert/transaction", kWriteOperations, BenchmarkPreparedWrites);
     RunBenchmark("manual BEGIN/COMMIT", kTransactionOperations, BenchmarkManualTransaction);

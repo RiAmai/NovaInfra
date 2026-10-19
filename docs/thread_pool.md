@@ -108,3 +108,7 @@ ctest --test-dir build/linux-ninja-debug -R '^ThreadPool' --output-on-failure
 
 基准通过 `-DNOVAINFRA_THREAD_POOL_BUILD_BENCHMARKS=ON` 构建，覆盖 `post`、`submit`、单/多生产者、
 小/大队列和较大 lambda 捕获；其输出用于比较当前机器上的基线，不等同于业务任务性能。
+
+## 生产容量和延迟
+
+先按 CPU 配额、任务耗时和阻塞比例确定 worker 数，再按可接受排队时间确定容量。增大容量会保留更多任务及捕获对象，并可能提高尾延迟；空任务吞吐不能替代业务负载。基准新增 CPU 任务在 worker 数和队列容量组合下的入队到完成 P50/P95/P99，包含生产者等待空间的时间，并报告进程峰值 RSS。

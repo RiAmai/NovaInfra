@@ -5,8 +5,11 @@
 
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <string>
 #include <type_traits>
+#include <unordered_set>
+#include <vector>
 
 NOVAINFRA_NAMESPACE_BEGIN
 namespace config {
@@ -14,13 +17,20 @@ namespace config {
 class NOVAINFRA_LIB_PORT Snapshot
 {
 public:
-    Snapshot() = default;
-    explicit Snapshot(Value root) : root_(std::move(root)) {}
+    Snapshot() : data_(emptyData()) {}
+    explicit Snapshot(Value root) : Snapshot(std::move(root), {}) {}
 
-    const Value &root() const noexcept { return root_; }
-    const Value *find(const std::string &path) const noexcept { return root_.find(path); }
+    const Value &root() const noexcept { return data_ ? data_->root : emptyData()->root; }
+    const Value *find(const std::string &path) const noexcept { return root().find(path); }
     bool contains(const std::string &path) const noexcept { return find(path) != nullptr; }
-    std::string dump(bool redact = true) const { return root_.toString(redact); }
+    std::string dump(bool redact = true) const
+    {
+        if (!redact || !data_ || data_->secrets.empty())
+            return root().toString(redact);
+        Value masked = root();
+        redactSecrets(masked, {}, data_->secrets);
+        return masked.toString(true);
+    }
 
     template <typename T>
     Result<T> get(const std::string &path) const
@@ -33,6 +43,36 @@ public:
     }
 
 private:
+    friend class ConfigManager;
+    struct Data {
+        Value root;
+        std::unordered_set<std::string> secrets;
+    };
+    Snapshot(Value root, std::vector<std::string> secrets)
+        : data_(std::make_shared<const Data>(Data{
+              std::move(root),
+              {secrets.begin(), secrets.end()}
+    }))
+    {
+    }
+    static const std::shared_ptr<const Data> &emptyData()
+    {
+        static const auto empty = std::make_shared<const Data>(Data{Value(Value::Object{}), {}});
+        return empty;
+    }
+    static void redactSecrets(Value &value, const std::string &prefix,
+                              const std::unordered_set<std::string> &secrets)
+    {
+        if (secrets.find(prefix) != secrets.end()) {
+            value = Value("<redacted>");
+            return;
+        }
+        // Match Schema's traversal, including literal TOML keys containing dots.
+        if (auto object = std::get_if<Value::Object>(&value.storage()))
+            for (auto &entry : *object)
+                redactSecrets(entry.second, prefix.empty() ? entry.first : prefix + "." + entry.first,
+                              secrets);
+    }
     template <typename T>
     static Result<T> convert(const Value &value, const std::string &path)
     {
@@ -70,19 +110,29 @@ private:
                 return static_cast<T>(*p);
             return fail();
         } else if constexpr (std::is_floating_point<T>::value) {
+            long double numeric = 0;
             if (auto p = std::get_if<double>(&value.storage()))
-                return static_cast<T>(*p);
-            if (auto p = std::get_if<std::int64_t>(&value.storage()))
-                return static_cast<T>(*p);
-            if (auto p = std::get_if<std::uint64_t>(&value.storage()))
-                return static_cast<T>(*p);
-            return fail();
+                numeric = *p;
+            else if (auto p = std::get_if<std::int64_t>(&value.storage()))
+                numeric = *p;
+            else if (auto p = std::get_if<std::uint64_t>(&value.storage()))
+                numeric = *p;
+            else
+                return fail();
+            if (!std::isfinite(numeric) ||
+                numeric > static_cast<long double>(std::numeric_limits<T>::max()) ||
+                numeric < -static_cast<long double>(std::numeric_limits<T>::max()))
+                return fail();
+            const auto converted = static_cast<T>(numeric);
+            if (!std::isfinite(converted) || (numeric != 0 && converted == 0))
+                return fail();
+            return converted;
         } else {
             static_assert(!sizeof(T), "Snapshot::get<T> needs a supported scalar type");
         }
     }
 
-    Value root_{Value::Object{}};
+    std::shared_ptr<const Data> data_;
 };
 
 }  // namespace config

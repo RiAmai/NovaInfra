@@ -264,3 +264,130 @@ TEST(StateMachineRuntime, ExecutorExceptionIsCounted)
     EXPECT_EQ(stats.queued, 0U);
     EXPECT_TRUE(error != nullptr);
 }
+
+namespace {
+struct RuntimeProbeMachine {
+    std::function<void()> action;
+    template <typename Event>
+    bool process_event(const Event &)
+    {
+        if (action)
+            action();
+        return true;
+    }
+    void flush_queue() {}
+};
+}
+
+TEST(StateMachineRuntime, OwnsMoveOnlyEvents)
+{
+    RuntimeProbeMachine machine;
+    novainfra::statemachine::StateMachineRuntime runtime(machine);
+    auto payload = std::make_unique<int>(42);
+    EXPECT_EQ(runtime.post(std::move(payload)), novainfra::statemachine::PostStatus::ACCEPTED);
+    EXPECT_EQ(payload, nullptr);
+    EXPECT_EQ(runtime.poll(), 1U);
+}
+
+TEST(StateMachineRuntime, BoundedDrainStaysStoppingUntilQueueIsEmpty)
+{
+    RuntimeProbeMachine machine;
+    novainfra::statemachine::StateMachineRuntime runtime(machine);
+    runtime.post(1);
+    runtime.post(2);
+    runtime.shutdown();
+    EXPECT_EQ(runtime.poll(1), 1U);
+    EXPECT_EQ(runtime.stats().status, novainfra::statemachine::RuntimeStatus::STOPPING);
+    EXPECT_EQ(runtime.poll(1), 1U);
+    EXPECT_EQ(runtime.stats().status, novainfra::statemachine::RuntimeStatus::STOPPED);
+}
+
+TEST(StateMachineRuntime, DiscardAndFailureReleasePayloadsOutsideMutex)
+{
+    for (bool fail : {false, true}) {
+        RuntimeProbeMachine machine;
+        novainfra::statemachine::StateMachineRuntime runtime(machine);
+        bool released = false;
+        auto payload = std::shared_ptr<int>(new int(1), [&](int *p) {
+            EXPECT_FALSE(runtime.accepting());
+            released = true;
+            delete p;
+        });
+        if (fail) {
+            machine.action = [] { throw std::runtime_error("event failed"); };
+            runtime.post(0);
+        }
+        runtime.post(std::move(payload));
+        if (fail)
+            runtime.poll();
+        else
+            runtime.shutdown(novainfra::statemachine::ShutdownMode::DISCARD);
+        EXPECT_TRUE(released);
+    }
+}
+
+TEST(StateMachineRuntime, DestructorCancelsDelayedExecutorWithoutWaiting)
+{
+    RuntimeProbeMachine machine;
+    int calls = 0;
+    machine.action = [&] { ++calls; };
+    novainfra::statemachine::EventTask delayed;
+    novainfra::statemachine::RuntimeOptions options;
+    options.executor = [&](auto task) {
+        delayed = std::move(task);
+        return true;
+    };
+    {
+        novainfra::statemachine::StateMachineRuntime runtime(machine, options);
+        runtime.post(1);
+    }
+    delayed();
+    EXPECT_EQ(calls, 0);
+}
+
+TEST(StateMachineRuntime, DestructorWaitsForRunningEvent)
+{
+    std::promise<void> entered, release, destroying, destroyed;
+    auto gate = release.get_future().share();
+    auto complete = destroyed.get_future();
+    RuntimeProbeMachine machine;
+    machine.action = [&] {
+        entered.set_value();
+        gate.wait();
+    };
+    std::thread worker;
+    novainfra::statemachine::RuntimeOptions options;
+    options.executor = [&](auto task) {
+        worker = std::thread(std::move(task));
+        return true;
+    };
+    using Runtime = novainfra::statemachine::StateMachineRuntime<RuntimeProbeMachine>;
+    auto runtime = std::make_unique<Runtime>(machine, options);
+    runtime->post(1);
+    entered.get_future().wait();
+    std::thread disposer([&] {
+        destroying.set_value();
+        runtime.reset();
+        destroyed.set_value();
+    });
+    destroying.get_future().wait();
+    EXPECT_EQ(complete.wait_for(std::chrono::milliseconds(30)), std::future_status::timeout);
+    release.set_value();
+    disposer.join();
+    worker.join();
+    EXPECT_EQ(complete.wait_for(std::chrono::seconds(1)), std::future_status::ready);
+}
+
+TEST(StateMachineRuntime, DestructionFromOwnPollCallbackFailsFast)
+{
+    EXPECT_DEATH(
+        {
+            RuntimeProbeMachine machine;
+            using Runtime = novainfra::statemachine::StateMachineRuntime<RuntimeProbeMachine>;
+            auto runtime = std::make_unique<Runtime>(machine);
+            machine.action = [&] { runtime.reset(); };
+            runtime->post(1);
+            runtime->poll();
+        },
+        "");
+}

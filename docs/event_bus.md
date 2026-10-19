@@ -66,6 +66,7 @@ auto report = bus.publish(UserCreated{7});
 
 订阅句柄是移动语义的 RAII 对象，析构或 `cancel()` 会取消订阅。发布按注册顺序执行订阅快照，
 回调不在总线内部锁中运行。取消不会启动新的回调，已经开始的回调允许完成。
+同步回调或错误处理器可以销毁所属总线；当前发布调用会保留内部状态，继续完成已有的订阅快照。
 
 ## 异步发布和背压
 
@@ -109,3 +110,7 @@ ctest --test-dir build/linux-ninja-debug -R '^EventBus' --output-on-failure
 ```
 
 基准通过 `-DNOVAINFRA_EVENT_BUS_BUILD_BENCHMARKS=ON` 构建。
+
+异步交付计数按事件汇总后更新，回调执行期间 `stats()` 可能暂未计入当前事件；排空后计数完整。队列丢弃、执行器拒绝及订阅清理都会在锁外释放用户载荷和回调捕获。
+
+基准包含同步 1/8 订阅者；启用 ThreadPool 模块时增加异步 CPU 回调、8/1024 容量及三种背压策略，报告接受吞吐、拒绝/丢弃数、逐事件延迟和进程峰值 RSS。

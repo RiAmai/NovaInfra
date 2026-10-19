@@ -24,4 +24,8 @@ if(NOVAINFRA_STATE_MACHINE_BUILD_EXAMPLES)
     # 示例展示 typed event 和外部 executor 的基本用法。
     add_executable(example_state_machine examples/state_machine_example.cpp)
     target_link_libraries(example_state_machine PRIVATE NovaInfra::StateMachine)
+
+    # 复杂状态机示例：订单处理、门禁系统和游戏角色状态。
+    add_executable(example_state_machine_complex examples/complex_example.cpp)
+    target_link_libraries(example_state_machine_complex PRIVATE NovaInfra::StateMachine)
 endif()

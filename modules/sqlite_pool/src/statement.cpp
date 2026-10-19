@@ -3,6 +3,7 @@
 
 #include <array>
 #include <charconv>
+#include <limits>
 #include <utility>
 
 NOVAINFRA_NAMESPACE_BEGIN
@@ -17,8 +18,13 @@ static std::string colToString(sqlite3_stmt *s, int c)
                 std::to_chars(buffer.data(), buffer.data() + buffer.size(), sqlite3_column_int64(s, c));
             return std::string(buffer.data(), result.ptr);
         }
-        case SQLITE_FLOAT:
-            return std::to_string(sqlite3_column_double(s, c));
+        case SQLITE_FLOAT: {
+            std::array<char, 64> buffer{};
+            const auto result =
+                std::to_chars(buffer.data(), buffer.data() + buffer.size(), sqlite3_column_double(s, c),
+                              std::chars_format::general, std::numeric_limits<double>::max_digits10);
+            return std::string(buffer.data(), result.ptr);
+        }
         case SQLITE_NULL:
             return "";
         default: {

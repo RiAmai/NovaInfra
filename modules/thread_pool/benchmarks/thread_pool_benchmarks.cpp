@@ -1,4 +1,5 @@
 #include <thread_pool/thread_pool.h>
+#include "../../../benchmarks/metrics.h"
 
 #include <algorithm>
 #include <array>
@@ -133,4 +134,31 @@ int main(int argc, char **argv)
             std::abort();
         }
     });
+    for (const auto workers : {std::size_t{1}, std::min<std::size_t>(workerCount, 8)}) {
+        for (const auto capacity : {std::size_t{8}, std::size_t{1024}}) {
+            options.workerCount = workers;
+            options.queueCapacity = capacity;
+            novainfra::threadpool::ThreadPool pool(options);
+            const auto count = std::min<std::size_t>(operations, 20000);
+            std::vector<double> latencies(count);
+            std::vector<std::uint64_t> results(count);
+            const auto start = Clock::now();
+            for (std::size_t i = 0; i < count; ++i) {
+                const auto sent = Clock::now();
+                pool.post([&, i, sent] {
+                    std::uint64_t value = i + 1;
+                    for (int j = 0; j < 1000; ++j)
+                        value = value * 1664525 + 1013904223;
+                    results[i] = value;
+                    latencies[i] = benchmark::microseconds(Clock::now() - sent);
+                });
+            }
+            pool.waitIdle();
+            benchmark::report("CPU task enqueue-to-completion w=" + std::to_string(workers) +
+                                  " q=" + std::to_string(capacity),
+                              std::move(latencies), Clock::now() - start, count);
+            if (results.back() == 0)
+                return 1;
+        }
+    }
 }

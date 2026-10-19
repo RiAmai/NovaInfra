@@ -217,27 +217,27 @@ HealthCheckResult ConnectionPool::checkHealth()
     std::lock_guard<std::mutex> runLock(healthMtx_);
     HealthCheckResult result;
 
-    // Read slots are protected individually by slotMtx. The lock also prevents
-    // a new lease from racing with a probe or replacement.
-    {
-        std::unique_lock<std::mutex> lock(state_->slotMtx);
-        for (Size i = 0; i < state_->readDbs.size(); ++i) {
+    // Reserve one idle slot at a time. Probe/open/postOpen can be slow and
+    // must not hold the mutex used by all readers and lease destructors.
+    for (Size i = 0; i < state_->readDbs.size(); ++i) {
+        sqlite3 *db = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(state_->slotMtx);
             if (state_->readBusy[i]) {
                 ++result.skippedBusy;
                 continue;
             }
-
-            ++result.checked;
-            sqlite3 *db = state_->readDbs[i];
-            if (probe(db)) {
-                ++result.healthy;
-                continue;
-            }
-
-            state_->readDbs[i] = nullptr;
+            state_->readBusy[i] = true;
+            db = state_->readDbs[i];
+        }
+        ++result.checked;
+        if (probe(db)) {
+            ++result.healthy;
+        } else {
             if (db) {
                 sqlite3_close_v2(db);
             }
+            db = nullptr;
             NOVAINFRA_TRY
             {
                 sqlite3 *replacement = openDb(true);
@@ -249,10 +249,15 @@ HealthCheckResult ConnectionPool::checkHealth()
                     sqlite3_close_v2(replacement);
                     NOVAINFRA_RETHROW_CURRENT();
                 })
-                state_->readDbs[i] = replacement;
+                db = replacement;
                 ++result.replaced;
             }
             NOVAINFRA_CATCH_ALL_BODY({ ++result.failed; })
+        }
+        {
+            std::lock_guard<std::mutex> lock(state_->slotMtx);
+            state_->readDbs[i] = db;
+            state_->readBusy[i] = false;
         }
         state_->slotCv.notify_all();
     }

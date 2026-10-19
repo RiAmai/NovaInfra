@@ -58,9 +58,9 @@ flowchart LR
 ### 并发、生命周期与失败处理
 
 `ConfigManager::Impl` 使用重载互斥量串行化构建，并通过原子共享指针替换当前
-`shared_ptr<const Snapshot>`。读取线程只需取得快照副本即可无锁读取；重载期间继续看到旧快照。
+`shared_ptr<const Snapshot>`。快照通过共享指针原子取得；持有快照后的查询无需 Manager 锁，重载期间继续看到旧快照。
 监听线程由 `ConfigManager` 管理，析构或 `stopWatching()` 会唤醒并 join 线程。监听回调在发布结果后调用，
-回调异常不会把线程传播到调用方。
+校验器或回调抛出的异常会停止监听，并由 `watchFailure()` 保存；普通解析/校验错误通过回调返回，监听继续运行。
 
 ### 依赖边界
 
@@ -81,7 +81,7 @@ Config 依赖 `NovaInfra::Core`、C++17 线程库和 toml++ 实现细节。toml+
 #include <string>
 
 novainfra::config::Schema schema;
-schema.required<std::int64_t>("server.port", {.min = 1, .max = 65535});
+schema.required<std::int64_t>("server.port", novainfra::config::FieldConstraints{1, 65535, {}, {}, {}});
 schema.optional<std::string>("server.host", "127.0.0.1");
 schema.optional<bool>("server.tls", false);
 ```
@@ -100,7 +100,7 @@ schema.optional<bool>("server.tls", false);
 int main(int argc, const char **argv)
 {
     novainfra::config::Schema schema;
-    schema.required<std::int64_t>("server.port", {.min = 1, .max = 65535});
+    schema.required<std::int64_t>("server.port", novainfra::config::FieldConstraints{1, 65535, {}, {}, {}});
     schema.optional<std::string>("server.host", "127.0.0.1");
 
     std::vector<novainfra::config::FileSpec> files{{"app.toml", true}};
@@ -162,6 +162,7 @@ schema.optional<std::int64_t>("server.port", 8080);
 ```
 
 如果 TOML、环境变量或命令行提供了 `server.port`，这些值会覆盖 `8080`。
+如果已有父节点不是对象（例如 `server = "broken"`），默认值注入会返回 `TYPE_MISMATCH`，保留原父节点。
 
 ### 多个 TOML 文件
 
@@ -278,13 +279,14 @@ schema.optional<std::int64_t>("database.pool_size", 4);
 
 ```cpp
 schema.required<std::int64_t>(
-    "server.port", {.min = 1, .max = 65535});
+    "server.port", novainfra::config::FieldConstraints{1, 65535, {}, {}, {}});
 
 schema.optional<double>(
-    "server.timeout_seconds", 5.0, {.min = 0.1, .max = 300.0});
+    "server.timeout_seconds", 5.0, novainfra::config::FieldConstraints{0.1, 300.0, {}, {}, {}});
 ```
 
-范围校验失败会返回 `INVALID_VALUE`。范围字段使用 `double` 表示约束，业务需要避免超出可精确表示的极大整数范围。
+范围校验失败会返回 `INVALID_VALUE`。范围字段使用 `double` 表示约束；整数比较保留整数自身的精度，
+但约束边界本身仍受 `double` 表示范围限制。NaN 边界会返回 `INVALID_VALUE`。
 
 ### 字符串约束和枚举
 
@@ -367,7 +369,7 @@ if (!port) {
 
 `Snapshot::get<T>()` 支持字符串、布尔值、有符号整数、无符号整数和浮点数。整数读取会检查目标类型上下界；
 例如配置为 `5000000000` 时，`get<int>()` 返回 `TYPE_MISMATCH`，`get<std::int64_t>()` 可正常读取。
-浮点读取可以接受整数值。
+浮点读取可以接受整数值；非有限值、超出目标类型范围或转换后下溢为零会返回 `TYPE_MISMATCH`。
 
 ### 通用 Value 访问
 
@@ -389,11 +391,14 @@ snapshot.root();
 snapshot.dump();
 ```
 
-`find()` 找不到键时返回 `nullptr`。`dump()` 默认使用脱敏输出，适合调试和诊断；需要查看原始字符串时必须显式传入 `false`，并确认输出目标不会暴露敏感配置。
+`dump()` 默认掩盖所有字符串，并按 Schema 的 `secret` 标记掩盖数字、布尔值、数组或整个子树；`dump(false)` 输出原值。对象键和字符串中的引号、反斜线及控制字符会转义。
+脱敏也覆盖 TOML 中含字面点号的键；例如敏感路径 `credentials.pin` 会同时掩盖嵌套键和字面键 `"credentials.pin"`。
+
+`find()` 找不到键时返回 `nullptr`。
 
 ### 快照生命周期
 
-快照是不可变值对象。`ConfigManager::snapshot()` 返回当前快照的副本，Manager 后续 reload 不会修改已经取得的快照。多个线程可以同时读取各自持有的快照，不需要额外的配置锁。
+快照共享不可变配置树和秘密字段元数据，复制和 `ConfigManager::snapshot()` 的复杂度为 O(1)。Manager 后续 reload 不会修改已经取得的快照。多个线程可以同时读取各自持有的快照，不需要额外的配置锁。快照内部布局已变更，升级后请重新编译应用。
 
 ## 错误和诊断
 
@@ -488,6 +493,10 @@ manager.stopWatching();
 Manager 析构时也会停止监听线程。回调中可调用 `stopWatching()` 发出停止请求；旧监听线程尚未退出时，
 `startWatching()` 返回 `RELOAD_FAILED`。监听回调运行在线程中，应该保持短小，不应执行长时间的文件或网络操作。
 
+多个外部线程可并发调用 `stopWatching()`：一个调用负责 join，其余调用等待回收完成后返回，
+不会继续 join 随后重启的监听线程。停止过程中启动监听会返回 `RELOAD_FAILED`，调用方可在停止完成后重试。
+若其他线程已成功重启监听，先前的 `stopWatching()` 返回时 `watching()` 可能为 `true`。
+
 ## 构建与测试
 
 ### NovaInfra 仓库内构建
@@ -548,3 +557,9 @@ Config 的加载、校验、读取和重载错误通过 `Result` 返回，不依
 - 加密存储和密钥轮换。
 - C++ 反射式自动绑定。
 - 多进程之间的配置变更协调。
+
+## 工具和基准
+
+`NOVAINFRA_CONFIG_BUILD_TOOLS=ON` 构建模板生成器和校验器；它们内置 webserver、database-service 示例 Schema，应用需替换为自身 Schema。全注释模板用于填写，必填项未启用时不能通过校验。
+
+`NOVAINFRA_CONFIG_BUILD_BENCHMARKS=ON` 构建 `benchmark_config`，兼容旧开关 `BUILD_BENCHMARKS`。基准覆盖完整配置加载、快照取得、缓存快照查询、重载及多线程读取；任何场景失败返回非零。逐次测量输出 P50/P95/P99，计时开销包含在结果内。

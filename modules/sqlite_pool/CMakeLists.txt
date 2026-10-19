@@ -29,11 +29,6 @@ else()
         $<$<CONFIG:Release>:-O3>
         $<$<CONFIG:Debug>:-g>
     )
-
-    if(ENABLE_SANITIZERS AND NOT WIN32)
-        add_compile_options(-fsanitize=address,thread)
-        add_link_options(-fsanitize=address,thread)
-    endif()
 endif()
 
 # Helper: compile the bundled amalgamation
@@ -51,8 +46,13 @@ function(add_sqlite_amalgamation target_name extra_defs extra_libs)
             "For SQLiteCipher: https://github.com/sqlcipher/sqlcipher")
     endif()
 
+    enable_language(C)
     add_library(${target_name} STATIC "${_src}")
-    target_include_directories(${target_name} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_include_directories(${target_name} PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    install(TARGETS ${target_name} EXPORT NovaInfraTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    install(FILES "${_hdr}" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
     target_compile_definitions(${target_name} PUBLIC
         SQLITE_THREADSAFE=2
         SQLITE_DEFAULT_WAL_SYNCHRONOUS=1
@@ -93,6 +93,8 @@ function(resolve_sqlcipher_crypto out_def out_lib)
 endfunction()
 
 # Resolve the actual SQLite target :
+set(NOVAINFRA_SQLITE_DEPENDENCY "")
+set(NOVAINFRA_SQLITE_CRYPTO_DEPENDENCY "")
 set(_use_cipher FALSE)
 set(_sqlite_target "") # will be set to the final CMake target name
 set(_sqlite_include_dirs "")
@@ -117,8 +119,7 @@ if(SQLITE_BACKEND STREQUAL "sqlcipher" OR SQLITE_BACKEND STREQUAL "auto")
     else()
         # try find_library
         find_library(_sqlcipher_lib NAMES sqlcipher)
-        find_path(_sqlcipher_inc NAMES sqlcipher/sqlite3.h
-            sqlite3.h PATH_SUFFIXES sqlcipher)
+        find_path(_sqlcipher_inc NAMES sqlite3.h PATH_SUFFIXES sqlcipher)
 
         if(_sqlcipher_lib AND _sqlcipher_inc)
             message(STATUS "Using system SQLiteCipher at ${_sqlcipher_lib}")
@@ -135,6 +136,11 @@ if(SQLITE_BACKEND STREQUAL "sqlcipher" OR SQLITE_BACKEND STREQUAL "auto")
                 add_sqlite_amalgamation(sqlcipher_amalgamation
                     "SQLITE_HAS_CODEC;${_cipher_def}" "${_cipher_lib}")
                 set(_sqlite_target "sqlcipher_amalgamation")
+
+                if(SQLCIPHER_CRYPTO STREQUAL "openssl")
+                    set(NOVAINFRA_SQLITE_CRYPTO_DEPENDENCY "OpenSSL")
+                endif()
+
                 set(_use_cipher TRUE)
             else()
                 message(STATUS "SQLiteCipher not found; falling back to plain SQLite")
@@ -153,6 +159,7 @@ if(NOT _use_cipher)
     if(SQLite3_FOUND)
         message(STATUS "Using system SQLite ${SQLite3_VERSION}")
         set(_sqlite_target "SQLite::SQLite3")
+        set(NOVAINFRA_SQLITE_DEPENDENCY "SQLite3")
         set(_plain_found TRUE)
     endif()
 
@@ -171,6 +178,7 @@ if(NOT _use_cipher)
             target_link_libraries(_sqlite3_pkgcfg INTERFACE ${PKGSQLITE3_LIBRARIES})
             target_link_directories(_sqlite3_pkgcfg INTERFACE ${PKGSQLITE3_LIBRARY_DIRS})
             set(_sqlite_target "_sqlite3_pkgcfg")
+            set(NOVAINFRA_SQLITE_DEPENDENCY "sqlite-pkg")
             set(_plain_found TRUE)
         endif()
     endif()
@@ -182,6 +190,22 @@ if(NOT _use_cipher)
         set(_sqlite_target "sqlite3_amalgamation")
     endif()
 endif()
+
+if(_use_cipher AND NOT _sqlite_target)
+    set(NOVAINFRA_SQLITE_DEPENDENCY "sqlcipher")
+    add_library(NovaInfraSQLiteBackend INTERFACE IMPORTED GLOBAL)
+    set_target_properties(NovaInfraSQLiteBackend PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${_sqlite_include_dirs}"
+        INTERFACE_LINK_LIBRARIES "${_sqlite_link_libraries}"
+        INTERFACE_LINK_DIRECTORIES "${_sqlite_link_directories}")
+    set(_sqlite_target NovaInfraSQLiteBackend)
+    set(_sqlite_include_dirs "")
+    set(_sqlite_link_libraries "")
+    set(_sqlite_link_directories "")
+endif()
+
+set(NOVAINFRA_SQLITE_DEPENDENCY "${NOVAINFRA_SQLITE_DEPENDENCY}" PARENT_SCOPE)
+set(NOVAINFRA_SQLITE_CRYPTO_DEPENDENCY "${NOVAINFRA_SQLITE_CRYPTO_DEPENDENCY}" PARENT_SCOPE)
 
 # -- Propagate the SQLITEPOOL_USE_SQLCIPHER definition to the pool -
 # Pool code can use #ifdef SQLITEPOOL_USE_SQLCIPHER to
@@ -203,13 +227,17 @@ target_include_directories(novainfra_sqlitepool PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_link_libraries(novainfra_sqlitepool PUBLIC NovaInfra::Core "${_sqlite_target}" ${_sqlite_link_libraries})
+
 if(_sqlite_include_dirs)
     target_include_directories(novainfra_sqlitepool PUBLIC ${_sqlite_include_dirs})
 endif()
+
 if(_sqlite_link_directories)
     target_link_directories(novainfra_sqlitepool PUBLIC ${_sqlite_link_directories})
 endif()
+
 set_target_properties(novainfra_sqlitepool PROPERTIES EXPORT_NAME SqlitePool)
+
 if(_use_cipher)
     target_compile_definitions(novainfra_sqlitepool PUBLIC SQLITEPOOL_USE_SQLCIPHER)
 endif()

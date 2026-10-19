@@ -7,6 +7,7 @@
 
 #include <condition_variable>
 #include <deque>
+#include <exception>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -32,7 +33,21 @@ private:
     struct Shared;
 
     /** @brief 队列中保存的、已经拥有事件数据的任务。 */
-    using Task = EventTask;
+    struct TaskBase {
+        virtual ~TaskBase() = default;
+        virtual void run(Shared &state) noexcept = 0;
+    };
+    using Task = std::unique_ptr<TaskBase>;
+
+    template <typename Event>
+    struct EventTaskImpl final : TaskBase {
+        template <typename T>
+        explicit EventTaskImpl(T &&value) : event(std::forward<T>(value))
+        {
+        }
+        void run(Shared &state) noexcept override { state.process(event); }
+        Event event;
+    };
 
     struct Shared : std::enable_shared_from_this<Shared> {
         /** @brief 保存状态机引用和运行时配置；容量为零时修正为一。 */
@@ -118,7 +133,7 @@ private:
          */
         void fail(std::type_index eventType, std::exception_ptr exception) noexcept
         {
-            RuntimeOptions localOptions;
+            std::deque<Task> retired;
             {
                 std::lock_guard<std::mutex> lock(mutex);
                 status = RuntimeStatus::FAILED;
@@ -126,13 +141,13 @@ private:
                 counters.status = status;
                 counters.failed++;
                 counters.dropped += queue.size();
-                queue.clear();
+                retired.swap(queue);
                 scheduled = false;
-                localOptions = options;
                 space.notify_all();
                 idle.notify_all();
             }
-            reportError(localOptions, eventType, exception);
+            retired.clear();
+            reportError(options, eventType, exception);
         }
 
         /** @brief 向外部 executor 提交唯一的 drain 任务。 */
@@ -169,11 +184,10 @@ private:
 
         /** @brief 将事件值移动保存到任务中，保证异步执行时事件仍然有效。 */
         template <typename Event>
-        static Task makeTask(const std::shared_ptr<Shared> &self, Event &&event)
+        static Task makeTask(Event &&event)
         {
             using StoredEvent = std::decay_t<Event>;
-            return
-                [self, event = StoredEvent(std::forward<Event>(event))]() mutable { self->process(event); };
+            return std::make_unique<EventTaskImpl<StoredEvent>>(std::forward<Event>(event));
         }
 
         /** @brief 在 drain 线程中执行一个事件并更新处理统计。 */
@@ -193,7 +207,6 @@ private:
                 report.exception = std::current_exception();
             })
 
-            RuntimeOptions localOptions;
             {
                 std::lock_guard<std::mutex> lock(mutex);
                 counters.processed++;
@@ -202,12 +215,11 @@ private:
                 } else if (report.status == ProcessStatus::UNHANDLED) {
                     counters.unhandled++;
                 }
-                localOptions = options;
             }
-            reportProcessed(localOptions, report);
+            reportProcessed(options, report);
 
             if (report.status == ProcessStatus::UNHANDLED) {
-                reportUnhandled(localOptions, report.eventType);
+                reportUnhandled(options, report.eventType);
             } else if (report.status == ProcessStatus::FAILED) {
                 fail(report.eventType, report.exception);
             }
@@ -236,7 +248,7 @@ private:
                         scheduled = false;
                         draining = false;
                         drainThread = std::thread::id{};
-                        if (!accepting && status != RuntimeStatus::FAILED) {
+                        if (!accepting && queue.empty() && status != RuntimeStatus::FAILED) {
                             status = RuntimeStatus::STOPPED;
                         }
                         counters.status = status;
@@ -252,14 +264,14 @@ private:
                     counters.active = 1;
                     space.notify_all();
                 }
-                task();
+                task->run(*this);
+                // User payload destructors may call stats()/post(). They must
+                // run without mutex and finish before this drain becomes idle.
+                task.reset();
                 ++drained;
                 {
                     std::lock_guard<std::mutex> lock(mutex);
                     counters.active = 0;
-                    if (status == RuntimeStatus::FAILED) {
-                        queue.clear();
-                    }
                 }
             }
         }
@@ -351,11 +363,15 @@ private:
         /** @brief 停止接收事件，并按指定策略排空或丢弃队列。 */
         void shutdown(ShutdownMode mode) noexcept
         {
+            std::deque<Task> retired;
             std::lock_guard<std::mutex> lock(mutex);
             accepting = false;
             if (mode == ShutdownMode::DISCARD) {
                 counters.dropped += queue.size();
-                queue.clear();
+                retired.swap(queue);
+                if (!draining) {
+                    scheduled = false;
+                }
             }
             if (status != RuntimeStatus::FAILED) {
                 status = (queue.empty() && !draining) ? RuntimeStatus::STOPPED : RuntimeStatus::STOPPING;
@@ -364,6 +380,22 @@ private:
             counters.queued = queue.size();
             space.notify_all();
             idle.notify_all();
+        }
+
+        void dispose() noexcept
+        {
+            shutdown(ShutdownMode::DISCARD);
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                if (draining && drainThread == std::this_thread::get_id()) {
+                    std::terminate();
+                }
+            }
+            std::unique_lock<std::mutex> pollLock(pollMutex);
+            std::unique_lock<std::mutex> lock(mutex);
+            // A delayed executor closure owns Shared and will find an empty
+            // queue. Only a drain already in progress can access the machine.
+            idle.wait(lock, [this] { return !draining; });
         }
 
         /** @brief 等待队列为空且当前 drain 任务结束。 */
@@ -401,8 +433,8 @@ public:
     {
     }
 
-    /** @brief 析构时停止接收事件并丢弃尚未开始处理的事件。 */
-    ~StateMachineRuntime() noexcept { state_->shutdown(ShutdownMode::DISCARD); }
+    /** @brief 丢弃待处理事件并等待正在执行的事件；禁止在自身回调中析构。 */
+    ~StateMachineRuntime() noexcept { state_->dispose(); }
 
     NOVAINFRA_DISABLE_COPY_MOVE(StateMachineRuntime)
 
@@ -414,7 +446,7 @@ public:
     template <typename Event>
     PostStatus post(Event &&event)
     {
-        return state_->post(Shared::makeTask(state_, std::forward<Event>(event)));
+        return state_->post(Shared::makeTask(std::forward<Event>(event)));
     }
 
     /** @brief 无 executor 时在当前线程处理事件，直到队列暂时为空。 */

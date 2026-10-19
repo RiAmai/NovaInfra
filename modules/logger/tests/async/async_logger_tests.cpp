@@ -664,4 +664,32 @@ TEST(AsyncLogger, StackManagedInstanceReportsOwnershipError)
     EXPECT_TRUE(sink->messages().empty());
 }
 
+TEST(AsyncLogger, BacktraceOwnsOriginallyStaticSourceUntilAsyncDispatch)
+{
+    auto sink = std::make_shared<BlockingRecordingSink>();
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(16, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("backtrace", sink, worker);
+    logger->info("hold");
+    const bool blocked = sink->waitUntilBlocked();
+    EXPECT_TRUE(blocked);
+    logger->setLevel(novainfra::log::Level::WARN);
+    logger->enableBacktrace(1);
+    logger->log(novainfra::log::SourceLocation::fromStatic("backtrace_file.cpp", 17, "backtrace_function"),
+                novainfra::log::Level::DEBUG, "hidden");
+    logger->dumpBacktrace();
+    sink->release();
+    worker.reset();
+    bool found = false;
+    for (const auto &msg : sink->messages()) {
+        if (msg.message == "hidden") {
+            found = true;
+            EXPECT_EQ(msg.file, "backtrace_file.cpp");
+            EXPECT_EQ(msg.function, "backtrace_function");
+            EXPECT_EQ(msg.line, 17);
+            EXPECT_FALSE(msg.staticSource);
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
 }  // namespace

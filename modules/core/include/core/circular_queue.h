@@ -12,13 +12,47 @@
 
 #include <cassert>
 #include <vector>
+#include <limits>
+#include <stdexcept>
 
-// circular quque view of std::vector.
+// Circular queue view of std::vector.
+//
+// Thread Safety:
+// - This class is NOT thread-safe by design for performance reasons.
+// - If used in a multi-threaded context, external synchronization is required.
+// - All operations (push_back, pop_front, empty, full, etc.) must be protected
+//   by a mutex or other synchronization mechanism when accessed from multiple threads.
+//
+// Example with mutex:
+//   std::mutex mtx;
+//   CircularQueue<int> queue(100);
+//
+//   // Thread 1: Push
+//   {
+//       std::lock_guard<std::mutex> lock(mtx);
+//       queue.push_back(42);
+//   }
+//
+//   // Thread 2: Pop
+//   {
+//       std::lock_guard<std::mutex> lock(mtx);
+//       if (!queue.empty()) {
+//           int value = queue.front();
+//           queue.pop_front();
+//       }
+//   }
 NOVAINFRA_NAMESPACE_BEGIN
 
 template <typename T>
 class CircularQueue
 {
+    static size_t storageSize(size_t capacity)
+    {
+        if (capacity == std::numeric_limits<size_t>::max()) {
+            NOVAINFRA_THROW(std::length_error("CircularQueue capacity overflows storage size"));
+        }
+        return capacity + 1;
+    }
     size_t maxItems_ = 0;
     typename std::vector<T>::size_type head_ = 0;
     typename std::vector<T>::size_type tail_ = 0;
@@ -32,12 +66,12 @@ public:
     CircularQueue() = default;
 
     explicit CircularQueue(size_t maxItems)
-        : maxItems_(maxItems + 1),  // one item is reserved as marker for full queue
+        : maxItems_(storageSize(maxItems)),  // one item is reserved as marker for full queue
           v_(maxItems_)
     {
     }
     CircularQueue(const CircularQueue &other) = default;
-    CircularQueue &operator=(const CircularQueue &ohter) = default;
+    CircularQueue &operator=(const CircularQueue &other) = default;
 
     // move cannot be default,
     // since we need to reset head_, tail_, etc to zero in the moved object

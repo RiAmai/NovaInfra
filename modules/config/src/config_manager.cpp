@@ -1,5 +1,7 @@
 #include <config/config_manager.h>
 
+#include "environment.h"
+
 #define TOML_EXCEPTIONS 0
 #include <toml.hpp>
 
@@ -9,8 +11,6 @@
 #include <fstream>
 #include <mutex>
 #include <unordered_map>
-
-extern char **environ;
 
 NOVAINFRA_NAMESPACE_BEGIN
 namespace config {
@@ -84,8 +84,7 @@ Result<Value> readEnvironment(const std::string &prefix, const Schema &schema)
     if (prefix.empty())
         return root;
     Error error;
-    for (char **item = environ; item && *item; ++item) {
-        std::string entry(*item);
+    for (const auto &entry : detail::currentEnvironment()) {
         const auto separator = entry.find('=');
         if (separator == std::string::npos || entry.compare(0, prefix.size(), prefix) != 0)
             continue;
@@ -179,6 +178,7 @@ struct ConfigManager::Impl {
     bool workerRunning = false;
     bool stopRequested = false;
     bool joining = false;
+    std::thread::id workerId;
     std::thread watcher;
     WatchOptions watchOptions;
     ChangeCallback callback;
@@ -192,6 +192,13 @@ struct ConfigManager::Impl {
         stopRequested = true;
         watching.store(false);
         wake.notify_all();
+        if (joining) {
+            if (workerId == std::this_thread::get_id())
+                return;
+            wake.wait(lock, [this] { return !joining; });
+            // The completed join satisfies this stop; watcher may now belong to a restart.
+            return;
+        }
         if (!watcher.joinable())
             return;
         if (watcher.get_id() == std::this_thread::get_id()) {
@@ -204,10 +211,20 @@ struct ConfigManager::Impl {
         thread.join();
         lock.lock();
         joining = false;
+        wake.notify_all();
     }
 };
 
 ConfigManager::ConfigManager() : impl_(std::make_shared<Impl>()) {}
+ConfigManager &ConfigManager::operator=(ConfigManager &&other) noexcept
+{
+    if (this != &other) {
+        if (impl_)
+            impl_->stop();
+        impl_ = std::move(other.impl_);
+    }
+    return *this;
+}
 ConfigManager::~ConfigManager()
 {
     if (impl_)
@@ -240,7 +257,11 @@ Result<Snapshot> ConfigManager::buildSnapshot(ConfigManager::Impl &impl)
     auto validation = impl.schema.validate(root);
     if (!validation)
         return validation.error();
-    return Snapshot(std::move(root));
+    std::vector<std::string> secrets;
+    for (const auto &field : impl.schema.fields_)
+        if (field.secret)
+            secrets.push_back(field.path);
+    return Snapshot(std::move(root), std::move(secrets));
 }
 
 Result<ConfigManager> ConfigManager::load(Schema schema, std::vector<FileSpec> files, std::string envPrefix,
@@ -296,7 +317,7 @@ Result<void> ConfigManager::startWatching(WatchOptions options, ChangeCallback c
     if (impl_->watcher.joinable())
         impl_->watcher.join();
     impl_->watchOptions = options;
-    impl_->callback = std::move(callback);
+    impl_->callback.swap(callback);
     impl_->times = fileTimes(impl_->files);
     impl_->failure = nullptr;
     impl_->stopRequested = false;
@@ -306,51 +327,52 @@ Result<void> ConfigManager::startWatching(WatchOptions options, ChangeCallback c
     {
         impl_->watcher = std::thread([impl = impl_] {
             std::unique_lock<std::mutex> lock(impl->watchMutex);
-            while (!impl->stopRequested) {
-                if (impl->wake.wait_for(lock, impl->watchOptions.interval,
-                                        [&] { return impl->stopRequested; }))
-                    break;
-                lock.unlock();
-                const auto now = fileTimes(impl->files);
-                lock.lock();
-                if (impl->stopRequested)
-                    break;
-                if (now == impl->times)
-                    continue;
-                if (impl->wake.wait_for(lock, impl->watchOptions.debounce,
-                                        [&] { return impl->stopRequested; }))
-                    break;
-                lock.unlock();
-                const auto stable = fileTimes(impl->files);
-                lock.lock();
-                if (impl->stopRequested)
-                    break;
-                impl->times = stable;
-                lock.unlock();
-                std::unique_lock<std::mutex> reloadLock(impl->reloadMutex);
-                auto result = ConfigManager::buildSnapshot(*impl);
-                std::shared_ptr<const Snapshot> published;
-                if (result) {
-                    published = std::make_shared<const Snapshot>(std::move(result.value()));
-                    std::atomic_store(&impl->current, published);
-                }
-                reloadLock.unlock();
-                if (impl->callback) {
-                    auto current = published ? published : std::atomic_load(&impl->current);
-                    NOVAINFRA_TRY
-                    {
+            impl->workerId = std::this_thread::get_id();
+            NOVAINFRA_TRY
+            {
+                while (!impl->stopRequested) {
+                    if (impl->wake.wait_for(lock, impl->watchOptions.interval,
+                                            [&] { return impl->stopRequested; }))
+                        break;
+                    lock.unlock();
+                    const auto now = fileTimes(impl->files);
+                    lock.lock();
+                    if (impl->stopRequested)
+                        break;
+                    if (now == impl->times)
+                        continue;
+                    if (impl->wake.wait_for(lock, impl->watchOptions.debounce,
+                                            [&] { return impl->stopRequested; }))
+                        break;
+                    lock.unlock();
+                    const auto stable = fileTimes(impl->files);
+                    lock.lock();
+                    if (impl->stopRequested)
+                        break;
+                    impl->times = stable;
+                    lock.unlock();
+                    std::unique_lock<std::mutex> reloadLock(impl->reloadMutex);
+                    auto result = ConfigManager::buildSnapshot(*impl);
+                    std::shared_ptr<const Snapshot> published;
+                    if (result) {
+                        published = std::make_shared<const Snapshot>(std::move(result.value()));
+                        std::atomic_store(&impl->current, published);
+                    }
+                    reloadLock.unlock();
+                    if (impl->callback) {
+                        auto current = published ? published : std::atomic_load(&impl->current);
                         impl->callback(*current, result ? nullptr : &result.error());
                     }
-                    NOVAINFRA_CATCH_ALL_BODY({
-                        std::lock_guard<std::mutex> guard(impl->watchMutex);
-                        impl->failure = std::current_exception();
-                        impl->stopRequested = true;
-                        impl->watching.store(false);
-                        impl->wake.notify_all();
-                    })
+                    lock.lock();
                 }
-                lock.lock();
             }
+            NOVAINFRA_CATCH_ALL_BODY({
+                if (!lock.owns_lock())
+                    lock.lock();
+                impl->failure = std::current_exception();
+                impl->stopRequested = true;
+            })
+            impl->workerId = {};
             impl->workerRunning = false;
             impl->watching.store(false);
             impl->wake.notify_all();

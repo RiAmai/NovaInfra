@@ -59,11 +59,12 @@ public:
     template <typename Event, typename Callback>
     Subscription subscribe(Callback &&callback)
     {
+        const auto state = state_;
         using T = std::decay_t<Event>;
         static_assert(std::is_invocable_r_v<void, Callback &, const T &>,
                       "EventBus callback must accept const Event&");
         std::function<void(const T &)> typed(std::forward<Callback>(callback));
-        return Subscription(state_->subscribe(typeid(T), [function = std::move(typed)](const void *value) {
+        return Subscription(state->subscribe(typeid(T), [function = std::move(typed)](const void *value) {
             function(*static_cast<const T *>(value));
         }));
     }
@@ -78,7 +79,9 @@ public:
     template <typename Event>
     DispatchReport publish(const Event &event)
     {
-        return state_->publish(typeid(std::decay_t<Event>), &event);
+        // A synchronous callback may destroy the owning EventBus.
+        const auto state = state_;
+        return state->publish(typeid(std::decay_t<Event>), &event);
     }
 
     /**
@@ -91,9 +94,10 @@ public:
     template <typename Event>
     AsyncPublishStatus publishAsync(Event &&event)
     {
+        const auto state = state_;
         using T = std::decay_t<Event>;
         auto payload = std::make_shared<T>(std::forward<Event>(event));
-        return state_->enqueue(typeid(T), std::move(payload), true);
+        return state->enqueue(typeid(T), std::move(payload), true);
     }
 
     /**
@@ -105,9 +109,10 @@ public:
     template <typename Event>
     AsyncPublishStatus tryPublishAsync(Event &&event)
     {
+        const auto state = state_;
         using T = std::decay_t<Event>;
         auto payload = std::make_shared<T>(std::forward<Event>(event));
-        return state_->enqueue(typeid(T), std::move(payload), false);
+        return state->enqueue(typeid(T), std::move(payload), false);
     }
 
     /**

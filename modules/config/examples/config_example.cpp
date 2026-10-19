@@ -5,7 +5,8 @@
 int main(int argc, const char **argv)
 {
     novainfra::config::Schema schema;
-    schema.optional<std::int64_t>("server.port", 8080, {.min = 1, .max = 65535});
+    schema.optional<std::int64_t>("server.port", 8080,
+                                  novainfra::config::FieldConstraints{1, 65535, {}, {}, {}});
     schema.optional<std::string>("server.host", "127.0.0.1");
     schema.optional<bool>("server.tls", false);
 

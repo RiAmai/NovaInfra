@@ -32,6 +32,9 @@ struct NOVAINFRA_LIB_PORT LogMsgBuffer : LogMsg {
     }
     LogMsgBuffer &operator=(const LogMsgBuffer &other)
     {
+        if (this == &other) {
+            return *this;
+        }
         LogMsg::operator=(other);
         buffer.clear();
         buffer.append(other.buffer);
@@ -40,6 +43,9 @@ struct NOVAINFRA_LIB_PORT LogMsgBuffer : LogMsg {
     }
     LogMsgBuffer &operator=(LogMsgBuffer &&other) NOVAINFRA_NOEXCEPT
     {
+        if (this == &other) {
+            return *this;
+        }
         LogMsg::operator=(other);
         buffer = std::move(other.buffer);
         updateStringView();
@@ -68,6 +74,9 @@ struct NOVAINFRA_LIB_PORT LogMsgBuffer : LogMsg {
         if (!source.function.empty()) {
             source.function = std::string_view(buffer.data() + offset, source.function.size());
         }
+        // These views now refer to this buffer, even when the original source
+        // location referred to static strings. Async messages must own a copy.
+        source = SourceLocation(source.file, source.line, source.function);
     }
 
     std::string buffer;

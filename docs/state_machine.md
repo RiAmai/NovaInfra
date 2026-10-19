@@ -38,7 +38,9 @@ flowchart LR
 
 Runtime 状态依次受 `RUNNING`、`STOPPING`、`STOPPED` 和 `FAILED` 控制。队列满时支持 BLOCK、REJECT 和
 DROP_NEWEST；executor 拒绝 drain 任务会记录失败并停止接收事件。`shutdown(DRAIN)` 处理已经接受的事件，
-`shutdown(DISCARD)` 清除未开始事件，`waitIdle()` 等待队列和 drain 任务结束。
+`shutdown(DISCARD)` 清除未开始事件，`waitIdle()` 等待队列和 drain 任务结束。`shutdown()` 本身不等待执行中的事件。
+
+析构会丢弃待处理事件并等待正在运行的 drain 结束，再返回给调用方；尚未开始的 executor 闭包之后执行也不会访问 Machine。不能在本 Runtime 的事件或观察回调中析构 Runtime，否则调用 `std::terminate()`。无 executor 时，DRAIN 后需要继续 `poll()`，有剩余事件时状态保持 STOPPING。事件可以是只能移动的类型；队列清理时的载荷析构在锁外执行。
 
 guard、action、entry 或 exit 回调抛出异常时，Runtime 调用 `onError`、清空剩余队列并进入 FAILED；未匹配
 事件通过 `onUnhandledEvent` 观察，处理结果通过 `onProcessed` 观察。回调异常会被隔离，不传播到 executor。

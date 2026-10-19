@@ -32,9 +32,17 @@ endif()
 if(NOVAINFRA_EVENT_BUS_BUILD_EXAMPLES)
     add_executable(example_event_bus examples/event_bus_example.cpp)
     target_link_libraries(example_event_bus PRIVATE NovaInfra::EventBus)
+
+    add_executable(example_event_bus_multi_event examples/multi_event_example.cpp)
+    target_link_libraries(example_event_bus_multi_event PRIVATE NovaInfra::EventBus)
 endif()
 
 if(NOVAINFRA_EVENT_BUS_BUILD_BENCHMARKS)
     add_executable(novainfra_event_bus_benchmarks benchmarks/event_bus_benchmarks.cpp)
     target_link_libraries(novainfra_event_bus_benchmarks PRIVATE NovaInfra::EventBus)
+
+    if(MODULES_THREAD_POOL_ENABLE)
+        target_link_libraries(novainfra_event_bus_benchmarks PRIVATE NovaInfra::ThreadPool)
+        target_compile_definitions(novainfra_event_bus_benchmarks PRIVATE NOVAINFRA_BENCHMARK_THREAD_POOL)
+    endif()
 endif()

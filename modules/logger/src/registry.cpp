@@ -101,9 +101,8 @@ void Registry::applyConfig(const std::shared_ptr<Logger> &logger, const ConfigSn
 void Registry::registerLogger(std::shared_ptr<Logger> newLogger)
 {
     validateLogger(newLogger);
-    std::lock_guard<std::mutex> updateLock(updateMutex_);
-
     ConfigSnapshot config;
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (loggers_.find(newLogger->name()) != loggers_.end()) {
@@ -122,17 +121,16 @@ void Registry::registerLogger(std::shared_ptr<Logger> newLogger)
 void Registry::registerOrReplaceLogger(std::shared_ptr<Logger> newLogger)
 {
     validateLogger(newLogger);
-    std::lock_guard<std::mutex> updateLock(updateMutex_);
-
     ConfigSnapshot config;
+    std::shared_ptr<Logger> retiredLogger;
+    std::shared_ptr<Logger> retiredDefault;
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     {
         std::lock_guard<std::mutex> lock(mutex_);
         config = configSnapshotLocked(newLogger->name());
     }
     applyConfig(newLogger, config);
 
-    std::shared_ptr<Logger> retiredLogger;
-    std::shared_ptr<Logger> retiredDefault;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         auto currentDefault = std::atomic_load_explicit(&defaultLogger_, std::memory_order_acquire);
@@ -154,9 +152,8 @@ void Registry::registerOrReplaceLogger(std::shared_ptr<Logger> newLogger)
 void Registry::initLogger(std::shared_ptr<Logger> newLogger)
 {
     validateLogger(newLogger);
-    std::lock_guard<std::mutex> updateLock(updateMutex_);
-
     ConfigSnapshot config;
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     bool autoRegistration = false;
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -186,17 +183,16 @@ void Registry::initLogger(std::shared_ptr<Logger> newLogger)
 void Registry::setDefaultLogger(std::shared_ptr<Logger> newDefaultLogger)
 {
     validateLogger(newDefaultLogger);
-    std::lock_guard<std::mutex> updateLock(updateMutex_);
-
     ConfigSnapshot config;
+    std::shared_ptr<Logger> retiredLogger;
+    std::shared_ptr<Logger> retiredDefault;
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     {
         std::lock_guard<std::mutex> lock(mutex_);
         config = configSnapshotLocked(newDefaultLogger->name());
     }
     applyConfig(newDefaultLogger, config);
 
-    std::shared_ptr<Logger> retiredLogger;
-    std::shared_ptr<Logger> retiredDefault;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = loggers_.find(newDefaultLogger->name());
@@ -283,8 +279,8 @@ void Registry::setFormatter(std::unique_ptr<formatters::IFormatter> formatter)
     }
 
     auto newFormatter = std::shared_ptr<formatters::IFormatter>(std::move(formatter));
-    std::lock_guard<std::mutex> updateLock(updateMutex_);
     std::shared_ptr<formatters::IFormatter> retiredFormatter;
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     std::shared_ptr<formatters::IFormatter> formatterSnapshot;
     std::vector<std::shared_ptr<Logger>> loggers;
     {
@@ -302,8 +298,8 @@ void Registry::setFormatter(std::unique_ptr<formatters::IFormatter> formatter)
 void Registry::setErrHandler(ErrHandler handler)
 {
     auto newHandler = handler ? std::make_shared<const ErrHandler>(std::move(handler)) : nullptr;
-    std::lock_guard<std::mutex> updateLock(updateMutex_);
     std::shared_ptr<const ErrHandler> retiredHandler;
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     std::shared_ptr<const ErrHandler> handlerSnapshot;
     std::vector<std::shared_ptr<Logger>> loggers;
     {
@@ -397,8 +393,10 @@ void Registry::flushAll()
 
 void Registry::dropLogger(const std::string &name)
 {
-    std::lock_guard<std::mutex> updateLock(updateMutex_);
+    // Retired objects may reenter Registry write APIs from their destructors.
+    // Keep them alive until both locks have been released, even on exceptions.
     std::shared_ptr<Logger> retiredLogger;
+    std::lock_guard<std::mutex> updateLock(updateMutex_);
     {
         std::lock_guard<std::mutex> lock(mutex_);
         const auto currentDefault = std::atomic_load_explicit(&defaultLogger_, std::memory_order_acquire);
@@ -415,12 +413,12 @@ void Registry::dropLogger(const std::string &name)
 
 void Registry::dropAll()
 {
+    Loggers retiredLoggers;
     std::lock_guard<std::mutex> updateLock(updateMutex_);
     const auto currentDefault = defaultLogger();
     Loggers replacement;
     replacement.emplace(currentDefault->name(), currentDefault);
 
-    Loggers retiredLoggers;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         retiredLoggers = std::move(loggers_);

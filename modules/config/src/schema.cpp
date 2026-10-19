@@ -142,6 +142,40 @@ bool matches(Value::Type expected, Value::Type actual)
     return expected == Value::Type::FLOATING &&
            (actual == Value::Type::SIGNED_INTEGER || actual == Value::Type::UNSIGNED_INTEGER);
 }
+
+bool hasNonObjectParent(const Value &root, const std::string &path)
+{
+    if (root.type() != Value::Type::OBJECT)
+        return true;
+    auto separator = path.find('.');
+    while (separator != std::string::npos) {
+        if (const auto *parent = root.find(path.substr(0, separator));
+            parent && parent->type() != Value::Type::OBJECT)
+            return true;
+        separator = path.find('.', separator + 1);
+    }
+    return false;
+}
+
+// Compare without rounding the integer to double. Check the conversion range
+// before truncating the bound, including platforms where long double == double.
+template <typename Integer>
+int compareInteger(Integer value, double bound)
+{
+    const double upper = std::ldexp(1.0, std::numeric_limits<Integer>::digits);
+    const double lower = std::is_signed<Integer>::value ? -upper : 0.0;
+    if (bound < lower)
+        return 1;
+    if (bound >= upper)
+        return -1;
+    const auto truncated = static_cast<Integer>(bound);
+    if (value < truncated)
+        return -1;
+    if (value > truncated)
+        return 1;
+    const double integral = std::trunc(bound);
+    return bound > integral ? -1 : (bound < integral ? 1 : 0);
+}
 }  // namespace
 
 Result<void> Schema::validate(Value &root) const
@@ -150,6 +184,11 @@ Result<void> Schema::validate(Value &root) const
     for (const auto &field : fields_) {
         auto *value = root.find(field.path);
         if (!value && field.defaultValue) {
+            if (hasNonObjectParent(root, field.path)) {
+                error.diagnostics.push_back({Severity::ERROR, ErrorCode::TYPE_MISMATCH, field.path, "schema",
+                                             0, 0, "configuration parent must be an object"});
+                continue;
+            }
             root[field.path] = *field.defaultValue;
             value = root.find(field.path);
         }
@@ -158,6 +197,16 @@ Result<void> Schema::validate(Value &root) const
                 error.diagnostics.push_back({Severity::ERROR, ErrorCode::MISSING_REQUIRED, field.path,
                                              "schema", 0, 0, "required configuration key is missing"});
             continue;
+        }
+        // TOML integers are signed; normalize only conversions that preserve
+        // the full integer value and the schema's declared representation.
+        if (field.type == Value::Type::UNSIGNED_INTEGER) {
+            if (const auto p = std::get_if<std::int64_t>(&value->storage()); p && *p >= 0)
+                *value = Value(static_cast<std::uint64_t>(*p));
+        } else if (field.type == Value::Type::SIGNED_INTEGER) {
+            if (const auto p = std::get_if<std::uint64_t>(&value->storage());
+                p && *p <= static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
+                *value = Value(static_cast<std::int64_t>(*p));
         }
         if (!matches(field.type, value->type())) {
             error.diagnostics.push_back({Severity::ERROR, ErrorCode::TYPE_MISMATCH, field.path, "schema", 0,
@@ -170,19 +219,25 @@ Result<void> Schema::validate(Value &root) const
             continue;
         }
         const auto &constraints = field.constraints;
+        if ((constraints.min && std::isnan(*constraints.min)) ||
+            (constraints.max && std::isnan(*constraints.max))) {
+            error.diagnostics.push_back({Severity::ERROR, ErrorCode::INVALID_VALUE, field.path, "schema", 0,
+                                         0, "numeric bounds must not be NaN"});
+            continue;
+        }
         if (const auto p = std::get_if<std::int64_t>(&value->storage())) {
-            if (constraints.min && static_cast<double>(*p) < *constraints.min)
+            if (constraints.min && compareInteger(*p, *constraints.min) < 0)
                 error.diagnostics.push_back({Severity::ERROR, ErrorCode::INVALID_VALUE, field.path, "schema",
                                              0, 0, "value is below the minimum"});
-            if (constraints.max && static_cast<double>(*p) > *constraints.max)
+            if (constraints.max && compareInteger(*p, *constraints.max) > 0)
                 error.diagnostics.push_back({Severity::ERROR, ErrorCode::INVALID_VALUE, field.path, "schema",
                                              0, 0, "value is above the maximum"});
         }
         if (const auto p = std::get_if<std::uint64_t>(&value->storage())) {
-            if (constraints.min && static_cast<double>(*p) < *constraints.min)
+            if (constraints.min && compareInteger(*p, *constraints.min) < 0)
                 error.diagnostics.push_back({Severity::ERROR, ErrorCode::INVALID_VALUE, field.path, "schema",
                                              0, 0, "value is below the minimum"});
-            if (constraints.max && static_cast<double>(*p) > *constraints.max)
+            if (constraints.max && compareInteger(*p, *constraints.max) > 0)
                 error.diagnostics.push_back({Severity::ERROR, ErrorCode::INVALID_VALUE, field.path, "schema",
                                              0, 0, "value is above the maximum"});
         }

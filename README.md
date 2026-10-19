@@ -154,7 +154,7 @@ int main()
 int main(int argc, const char **argv)
 {
     novainfra::config::Schema schema;
-    schema.required<std::int64_t>("server.port", {.min = 1, .max = 65535});
+    schema.required<std::int64_t>("server.port", novainfra::config::FieldConstraints{1, 65535, {}, {}, {}});
     schema.optional<std::string>("server.host", "127.0.0.1");
 
     auto loaded = novainfra::config::ConfigManager::load(
@@ -214,6 +214,7 @@ cmake -S . -B build/minimal -G Ninja \
 | `MODULES_EVENT_BUS_ENABLE` | `ON` | 启用 EventBus |
 | `MODULES_STATE_MACHINE_ENABLE` | `ON` | 启用 StateMachine |
 | `NOVAINFRA_NO_EXCEPTIONS` | `OFF` | 使用 `-fno-exceptions` 构建；错误处理语义会改变 |
+| `NOVAINFRA_SANITIZER` | `NONE` | `ADDRESS` 启用 ASan+UBSan，`THREAD` 单独启用 TSan |
 | `NOVAINFRA_ENABLE_IPO` | `OFF` | 在 Release 构建中启用编译器支持的 IPO |
 | `SQLITE_BACKEND` | `plain` | 选择 `plain`、`sqlcipher` 或 `auto` |
 
@@ -223,10 +224,11 @@ cmake -S . -B build/minimal -G Ninja \
 
 ### Benchmark
 
-Logger、ThreadPool、SqlitePool 和 EventBus 提供可选 microbenchmark。以 Release 配置为例：
+Logger、Config、ThreadPool、SqlitePool 和 EventBus 提供可选 microbenchmark。以 Release 配置为例：
 
 ```bash
 cmake -S . -B build/performance -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DNOVAINFRA_CONFIG_BUILD_BENCHMARKS=ON \
   -DNOVAINFRA_LOGGER_BUILD_BENCHMARKS=ON \
   -DNOVAINFRA_THREAD_POOL_BUILD_BENCHMARKS=ON \
   -DNOVAINFRA_SQLITE_POOL_BUILD_BENCHMARKS=ON \
@@ -234,7 +236,11 @@ cmake -S . -B build/performance -G Ninja -DCMAKE_BUILD_TYPE=Release \
 cmake --build build/performance
 ```
 
-Benchmark 用于建立当前机器上的吞吐基线，不代表具体业务任务的性能。
+Benchmark 用于建立当前机器上的吞吐基线，不代表具体业务任务的性能。新增逐操作或逐任务 P50/P95/P99 和进程峰值 RSS；原批量分位数标为 `batch-mean p95`。
+
+Sanitizer 使用独立构建目录：`-DNOVAINFRA_SANITIZER=ADDRESS` 或 `THREAD`，不能混用。旧开关 `ENABLE_SANITIZERS=ON` 映射为 ADDRESS。CMake preset 使用与最低版本 3.21 兼容的 schema。
+
+完整模块结论、已修复问题和验证记录见 [模块审计与优化实施记录](docs/audit-2026-10.md)。
 
 ## 目录结构
 

@@ -134,7 +134,7 @@ TEST(SqlitePool, MaterializedRowsPreserveNamesValuesAndEmbeddedNulls)
 
     ASSERT_EQ(rows.size(), 1U);
     EXPECT_EQ(rows[0].at("integer_value"), "9223372036854775807");
-    EXPECT_EQ(rows[0].at("real_value"), "2.500000");
+    EXPECT_EQ(rows[0].at("real_value"), "2.5");
     EXPECT_EQ(rows[0].at("text_value"), std::string("x\0y", 3));
     EXPECT_EQ(rows[0].at("null_value"), "");
 }
@@ -292,6 +292,231 @@ TEST(SqlitePool, BackgroundHealthCheckRunsAtConfiguredInterval)
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     EXPECT_TRUE(replaced);
+}
+
+TEST(SqlitePool, ConcurrentReads)
+{
+    TempDatabase database;
+    auto config = OneReader();
+    config.readConnections = 4;
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), config);
+    pool.write().exec("CREATE TABLE data(id INTEGER PRIMARY KEY, value TEXT)");
+    for (int i = 0; i < 100; ++i) {
+        pool.write().exec("INSERT INTO data(id, value) VALUES(" + std::to_string(i) + ", 'item_" +
+                          std::to_string(i) + "')");
+    }
+
+    constexpr int numReaders = 8;
+    constexpr int readsPerThread = 50;
+    std::vector<std::thread> readers;
+    std::atomic<int> totalReads{0};
+    std::atomic<int> errors{0};
+
+    for (int i = 0; i < numReaders; ++i) {
+        readers.emplace_back([&pool, &totalReads, &errors]() {
+            for (int j = 0; j < readsPerThread; ++j) {
+                try {
+                    auto rows = pool.read().query("SELECT COUNT(*) as count FROM data");
+                    if (rows.size() == 1 && rows[0].at("count") == "100") {
+                        ++totalReads;
+                    }
+                } catch (...) {
+                    ++errors;
+                }
+            }
+        });
+    }
+
+    for (auto &t : readers) {
+        t.join();
+    }
+
+    EXPECT_EQ(totalReads.load(), numReaders * readsPerThread);
+    EXPECT_EQ(errors.load(), 0);
+}
+
+TEST(SqlitePool, ConcurrentWritesAndReads)
+{
+    TempDatabase database;
+    auto config = OneReader();
+    config.readConnections = 4;
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), config);
+    pool.write().exec("CREATE TABLE counters(id INTEGER PRIMARY KEY, value INTEGER DEFAULT 0)");
+    pool.write().exec("INSERT INTO counters(id, value) VALUES(1, 0)");
+
+    constexpr int numWriters = 3;
+    constexpr int numReaders = 3;
+    constexpr int writesPerThread = 20;
+    constexpr int readsPerThread = 30;
+
+    std::atomic<int> successfulWrites{0};
+    std::atomic<int> successfulReads{0};
+
+    std::vector<std::thread> writers;
+    for (int i = 0; i < numWriters; ++i) {
+        writers.emplace_back([&pool, &successfulWrites]() {
+            for (int j = 0; j < writesPerThread; ++j) {
+                try {
+                    pool.write().exec("UPDATE counters SET value = value + 1 WHERE id = 1");
+                    ++successfulWrites;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                } catch (...) {
+                    // Write failed
+                }
+            }
+        });
+    }
+
+    std::vector<std::thread> readers;
+    for (int i = 0; i < numReaders; ++i) {
+        readers.emplace_back([&pool, &successfulReads]() {
+            for (int j = 0; j < readsPerThread; ++j) {
+                try {
+                    auto rows = pool.read().query("SELECT value FROM counters WHERE id = 1");
+                    if (rows.size() == 1) {
+                        ++successfulReads;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                } catch (...) {
+                    // Read failed
+                }
+            }
+        });
+    }
+
+    for (auto &t : writers) {
+        t.join();
+    }
+    for (auto &t : readers) {
+        t.join();
+    }
+
+    EXPECT_EQ(successfulWrites.load(), numWriters * writesPerThread);
+    EXPECT_EQ(successfulReads.load(), numReaders * readsPerThread);
+
+    // Verify final counter value
+    auto rows = pool.read().query("SELECT value FROM counters WHERE id = 1");
+    ASSERT_EQ(rows.size(), 1U);
+    EXPECT_EQ(rows[0].at("value"), std::to_string(numWriters * writesPerThread));
+}
+
+TEST(SqlitePool, ConcurrentTransactions)
+{
+    TempDatabase database;
+    novainfra::sqlitepool::ConnectionPool pool(database.string());
+    pool.write().exec("CREATE TABLE accounts(id INTEGER PRIMARY KEY, balance INTEGER)");
+    pool.write().exec("INSERT INTO accounts(id, balance) VALUES(1, 1000), (2, 1000)");
+
+    constexpr int numTransfers = 50;
+    std::atomic<int> successfulTransfers{0};
+    std::atomic<int> failedTransfers{0};
+
+    std::vector<std::thread> transferThreads;
+    for (int i = 0; i < numTransfers; ++i) {
+        transferThreads.emplace_back([&pool, &successfulTransfers, &failedTransfers, i]() {
+            try {
+                pool.write().transaction([i](novainfra::sqlitepool::WriteConn &db) {
+                    // Transfer 10 from account 1 to account 2
+                    db.exec("UPDATE accounts SET balance = balance - 10 WHERE id = 1");
+                    db.exec("UPDATE accounts SET balance = balance + 10 WHERE id = 2");
+                    if (i % 10 == 0) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    }
+                });
+                ++successfulTransfers;
+            } catch (...) {
+                ++failedTransfers;
+            }
+        });
+    }
+
+    for (auto &t : transferThreads) {
+        t.join();
+    }
+
+    EXPECT_EQ(successfulTransfers.load(), numTransfers);
+    EXPECT_EQ(failedTransfers.load(), 0);
+
+    // Verify balances
+    auto rows = pool.read().query("SELECT id, balance FROM accounts ORDER BY id");
+    ASSERT_EQ(rows.size(), 2U);
+    EXPECT_EQ(rows[0].at("balance"), std::to_string(1000 - numTransfers * 10));
+    EXPECT_EQ(rows[1].at("balance"), std::to_string(1000 + numTransfers * 10));
+}
+
+TEST(SqlitePool, StressTestReadPoolExhaustion)
+{
+    TempDatabase database;
+    auto config = OneReader();
+    config.readConnections = 2;
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), config);
+    pool.write().exec("CREATE TABLE items(id INTEGER)");
+    pool.write().exec("INSERT INTO items VALUES(1), (2), (3)");
+
+    constexpr int numThreads = 10;
+    constexpr int operationsPerThread = 20;
+    std::atomic<int> completedOps{0};
+
+    std::vector<std::thread> threads;
+    for (int i = 0; i < numThreads; ++i) {
+        threads.emplace_back([&pool, &completedOps]() {
+            for (int j = 0; j < operationsPerThread; ++j) {
+                auto reader = pool.read();  // Will block if pool is exhausted
+                auto rows = reader.query("SELECT COUNT(*) FROM items");
+                if (rows.size() == 1) {
+                    ++completedOps;
+                }
+            }
+        });
+    }
+
+    for (auto &t : threads) {
+        t.join();
+    }
+
+    EXPECT_EQ(completedOps.load(), numThreads * operationsPerThread);
+}
+
+TEST(SqlitePool, MaterializedDoublePreservesRoundTripPrecision)
+{
+    TempDatabase database;
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), OneReader());
+    for (double value : {1.2345678901234567, 1e-200, 1e200, -1.2345678901234567}) {
+        auto statement = pool.read().prepare("SELECT ? AS value");
+        auto rows = statement.bind(1, value).query();
+        ASSERT_EQ(rows.size(), 1U);
+        EXPECT_EQ(std::stod(rows.front().at("value")), value);
+    }
+}
+
+TEST(SqlitePool, SlowReadReplacementDoesNotBlockOtherReaderSlots)
+{
+    TempDatabase database;
+    auto config = OneReader();
+    config.readConnections = 2;
+    std::atomic<bool> replacing{false};
+    std::promise<void> entered, release;
+    auto gate = release.get_future().share();
+    config.postOpen = [&](sqlite3 *, bool writer) {
+        if (!writer && replacing.load()) {
+            entered.set_value();
+            gate.wait();
+        }
+    };
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), config);
+    {
+        auto reader = pool.read();
+        sqlite3_set_authorizer(reader.handle(), DenyAllAuthorizer, nullptr);
+    }
+    replacing.store(true);
+    auto health = std::async(std::launch::async, [&] { return pool.checkHealth(); });
+    entered.get_future().wait();
+    auto query = std::async(std::launch::async, [&] { return pool.read().query("SELECT 42 AS value"); });
+    const auto ready = query.wait_for(std::chrono::seconds(1));
+    release.set_value();
+    EXPECT_EQ(ready, std::future_status::ready);
+    EXPECT_EQ(query.get().front().at("value"), "42");
+    EXPECT_EQ(health.get().replaced, 1U);
 }
 
 }  // namespace

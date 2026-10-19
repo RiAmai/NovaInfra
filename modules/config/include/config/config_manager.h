@@ -24,7 +24,7 @@ public:
 
     ConfigManager();
     ConfigManager(ConfigManager &&) noexcept = default;
-    ConfigManager &operator=(ConfigManager &&) noexcept = default;
+    ConfigManager &operator=(ConfigManager &&other) noexcept;
     ~ConfigManager();
     ConfigManager(const ConfigManager &) = delete;
     ConfigManager &operator=(const ConfigManager &) = delete;

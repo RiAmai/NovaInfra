@@ -426,6 +426,8 @@ Registry 的配置和注册写操作会按顺序同步执行。`setLevel()`、`s
 `setErrHandler()`、Backtrace 配置以及 Logger 注册或替换返回时，操作开始前已经存在的相关
 Logger 都已完成本次配置。Registry 不会在内部状态锁中调用 Sink、Formatter、Flush 或 Logger
 析构代码，因此自定义组件可以查询 Registry；调用线程仍会同步承担这些操作的耗时。
+Registry 移除或替换的 Logger、全局 Formatter 和错误处理器会在释放状态锁及更新锁后销毁，
+这些对象的析构函数可以调用 Registry 写接口。
 
 Registry 不保证单个 Logger 的多个属性以原子方式切换。直接调用 Logger 成员配置函数也不受
 Registry 更新顺序约束。
@@ -609,3 +611,7 @@ std::unique_ptr<novainfra::log::formatters::IFormatter> clone() const override;
 | [`rotating_file_sink_example.cpp`](../modules/logger/examples/sinks/rotating_file_sink_example.cpp) | 文件滚动和历史文件 |
 | [`file_events_example.cpp`](../modules/logger/examples/sinks/file_events_example.cpp) | 文件回调和 IO 错误处理 |
 | [`custom_sink_formatter_example.cpp`](../modules/logger/examples/extensions/custom_sink_formatter_example.cpp) | 自定义 Sink 与 Formatter |
+
+### 基准计时口径
+
+吞吐场景的 `batch-mean p95` 是批量平均值的分位数。逐消息异步场景测量入队前到 sink 的 P50/P95/P99，包含格式化、排队和 sink 解析索引的开销，并报告进程峰值 RSS。回溯缓冲持有自己的 source 字符串；转入异步队列时复制这些字符串，直接日志宏仍使用静态 source 优化。

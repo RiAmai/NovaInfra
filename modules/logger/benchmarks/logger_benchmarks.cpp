@@ -5,8 +5,11 @@
 #include <logger/log.h>
 #include <logger/sinks/sink.h>
 
+#include "../../../benchmarks/metrics.h"
+
 #include <algorithm>
 #include <atomic>
+#include <charconv>
 #include <chrono>
 #include <cstdlib>
 #include <iomanip>
@@ -66,8 +69,8 @@ void PrintResult(const std::string &name, novainfra::Uint64 operations, const Sa
     const auto p95Ns = summary.p95 * 1'000'000'000.0 / static_cast<double>(operations);
     const auto millionPerSecond = static_cast<double>(operations) / summary.median / 1'000'000.0;
     std::cerr << std::left << std::setw(34) << name << std::right << std::fixed << std::setprecision(2)
-              << std::setw(12) << medianNs << " ns/op" << std::setw(12) << p95Ns << " p95" << std::setw(12)
-              << millionPerSecond << " Mops/s\n";
+              << std::setw(12) << medianNs << " ns/op" << std::setw(12) << p95Ns << " batch-mean p95"
+              << std::setw(12) << millionPerSecond << " Mops/s\n";
 }
 
 template <typename Function>
@@ -286,6 +289,45 @@ void RunAsyncBenchmark(const std::string &name, novainfra::Uint64 operations, st
     PrintResult(name + " end-to-end", operations, Summarize(std::move(endToEndSamples)));
 }
 
+class LatencySink final : public novainfra::log::sinks::ISink
+{
+public:
+    explicit LatencySink(std::size_t count) : sent(count), latency(count) {}
+    void log(const novainfra::log::LogMsg &msg) override
+    {
+        std::size_t index = 0;
+        const auto parsed =
+            std::from_chars(msg.message.data(), msg.message.data() + msg.message.size(), index);
+        if (parsed.ec != std::errc{} || index >= latency.size())
+            std::abort();
+        latency[index] = benchmark::microseconds(Clock::now() - sent[index]);
+        ++received;
+    }
+    void setPattern(const std::string &) override {}
+    void setFormatter(std::unique_ptr<novainfra::log::formatters::IFormatter>) override {}
+    void flush() override {}
+    std::vector<Clock::time_point> sent;
+    std::vector<double> latency;
+    std::size_t received = 0;
+};
+
+void RunMessageLatency(std::size_t count)
+{
+    auto sink = std::make_shared<LatencySink>(count);
+    auto worker = std::make_shared<novainfra::log::async::AsyncLogThreadPool>(8192, 1);
+    auto logger = std::make_shared<novainfra::log::async::AsyncLogger>("latency", sink, worker);
+    const auto start = Clock::now();
+    for (std::size_t i = 0; i < count; ++i) {
+        sink->sent[i] = Clock::now();
+        logger->info("{}", i);
+    }
+    worker.reset();
+    if (sink->received != count)
+        std::abort();
+    benchmark::report("async formatted enqueue-to-sink (includes index parsing)", std::move(sink->latency),
+                      Clock::now() - start, count);
+}
+
 void PrintConfiguration()
 {
     constexpr auto queueSlots = kAsyncQueueCapacity + 1;
@@ -313,13 +355,15 @@ void PrintConfiguration()
 
 }  // namespace
 
-int main()
+int main(int argc, char **argv)
 {
-    constexpr novainfra::Uint64 kFastOperations = 2'000'000;
-    constexpr novainfra::Uint64 kAsyncOperations = 400'000;
-    constexpr novainfra::Uint64 kExceptionOperations = 100'000;
+    const novainfra::Uint64 kFastOperations =
+        argc > 1 ? std::max<unsigned long long>(1, std::strtoull(argv[1], nullptr, 10)) : 2'000'000;
+    const novainfra::Uint64 kAsyncOperations = std::max<novainfra::Uint64>(4, kFastOperations / 5);
+    const novainfra::Uint64 kExceptionOperations = std::max<novainfra::Uint64>(1, kFastOperations / 20);
 
     PrintConfiguration();
+    RunMessageLatency(std::min<novainfra::Uint64>(kAsyncOperations, 20000));
     RunBenchmark("filtered formatted/local", kFastOperations, BenchmarkFiltered);
     RunBenchmark("sync literal/local", kFastOperations, BenchmarkSynchronousLiteral);
     RunBenchmark("sync formatted/local", kFastOperations, BenchmarkSynchronousFormatted);

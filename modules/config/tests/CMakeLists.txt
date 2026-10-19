@@ -12,7 +12,7 @@ endif()
 include(GoogleTest)
 add_executable(novainfra_config_tests config_tests.cpp)
 target_link_libraries(novainfra_config_tests PRIVATE NovaInfra::Config GTest::gtest_main)
-gtest_discover_tests(novainfra_config_tests DISCOVERY_MODE PRE_TEST)
+gtest_discover_tests(novainfra_config_tests DISCOVERY_MODE PRE_TEST PROPERTIES TIMEOUT 30)
 
 foreach(CONFIG_HEADER IN ITEMS config/config.h config/config_manager.h config/error.h config/schema.h config/snapshot.h config/types.h config/value.h)
     string(REPLACE "/" "_" CONFIG_HEADER_TARGET "${CONFIG_HEADER}")

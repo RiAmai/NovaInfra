@@ -1,6 +1,9 @@
 #include <config/value.h>
 
 #include <sstream>
+#include <iomanip>
+#include <limits>
+#include <locale>
 
 NOVAINFRA_NAMESPACE_BEGIN
 namespace config {
@@ -22,6 +25,43 @@ std::vector<std::string> parts(const std::string &path)
     return result;
 }
 
+void quote(std::ostringstream &out, const std::string &text)
+{
+    static constexpr char hex[] = "0123456789abcdef";
+    out << '"';
+    for (unsigned char c : text) {
+        switch (c) {
+            case '"':
+                out << "\\\"";
+                break;
+            case '\\':
+                out << "\\\\";
+                break;
+            case '\b':
+                out << "\\b";
+                break;
+            case '\f':
+                out << "\\f";
+                break;
+            case '\n':
+                out << "\\n";
+                break;
+            case '\r':
+                out << "\\r";
+                break;
+            case '\t':
+                out << "\\t";
+                break;
+            default:
+                if (c < 0x20)
+                    out << "\\u00" << hex[c >> 4] << hex[c & 15];
+                else
+                    out << static_cast<char>(c);
+        }
+    }
+    out << '"';
+}
+
 void dumpValue(std::ostringstream &out, const Value &value, bool redact)
 {
     if (std::holds_alternative<std::monostate>(value.storage()))
@@ -38,7 +78,7 @@ void dumpValue(std::ostringstream &out, const Value &value, bool redact)
         if (redact)
             out << "\"<redacted>\"";
         else
-            out << '"' << *p << '"';
+            quote(out, *p);
     } else if (const auto p = std::get_if<Value::Array>(&value.storage())) {
         out << '[';
         for (std::size_t i = 0; i < p->size(); ++i) {
@@ -55,7 +95,8 @@ void dumpValue(std::ostringstream &out, const Value &value, bool redact)
             if (!first)
                 out << ',';
             first = false;
-            out << '"' << item.first << "\":";
+            quote(out, item.first);
+            out << ':';
             dumpValue(out, item.second, redact);
         }
         out << '}';
@@ -152,6 +193,8 @@ void Value::merge(const Value &overlay)
 std::string Value::toString(bool redact) const
 {
     std::ostringstream out;
+    out.imbue(std::locale::classic());
+    out << std::setprecision(std::numeric_limits<double>::max_digits10);
     dumpValue(out, *this, redact);
     return out.str();
 }

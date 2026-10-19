@@ -40,6 +40,9 @@ endif()
 if(NOVAINFRA_THREAD_POOL_BUILD_EXAMPLES)
     add_executable(example_thread_pool examples/thread_pool_example.cpp)
     target_link_libraries(example_thread_pool PRIVATE NovaInfra::ThreadPool)
+
+    add_executable(example_thread_pool_real_world examples/real_world_example.cpp)
+    target_link_libraries(example_thread_pool_real_world PRIVATE NovaInfra::ThreadPool)
 endif()
 
 if(NOVAINFRA_THREAD_POOL_BUILD_BENCHMARKS)

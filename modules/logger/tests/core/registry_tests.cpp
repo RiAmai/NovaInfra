@@ -3,6 +3,7 @@
 #include <logger/sinks/base_sink.h>
 #include <logger/factories/synchronous_factory.h>
 #include <logger/log.h>
+#include <logger/formatters/pattern_formatter.h>
 
 #include <gtest/gtest.h>
 
@@ -123,6 +124,7 @@ public:
     ~ReentrantDestructorLogger() NOVAINFRA_OVERRIDE
     {
         NOVAINFRA_UNUSED(novainfra::log::defaultLogger());
+        novainfra::log::setAutoRegistration(true);
         destroyed_ = true;
     }
 
@@ -523,6 +525,86 @@ TEST_F(RegistryTest, ErrorHandlerCanBeReplacedWhileOtherThreadsReportFailures)
     loggerThread.join();
     configurationThread.join();
     EXPECT_EQ(firstHandlerCount.load() + secondHandlerCount.load(), kFailures);
+}
+
+
+TEST_F(RegistryTest, RetiredLoggerDestructorsMayReenterWriteOperations)
+{
+    for (int operation = 0; operation < 5; ++operation) {
+        SCOPED_TRACE(operation);
+        novainfra::log::shutdown();
+        std::atomic<bool> destroyed{false};
+        auto logger = std::make_shared<ReentrantDestructorLogger>("retired", destroyed);
+        if (operation == 2)
+            novainfra::log::setDefaultLogger(logger);
+        else
+            novainfra::log::registerLogger(logger);
+        logger.reset();
+        switch (operation) {
+            case 0:
+                novainfra::log::dropLogger("retired");
+                break;
+            case 1:
+                novainfra::log::registerOrReplaceLogger(std::make_shared<novainfra::log::Logger>("retired"));
+                break;
+            case 2:
+                novainfra::log::setDefaultLogger(std::make_shared<novainfra::log::Logger>("retired"));
+                break;
+            case 3:
+                novainfra::log::dropAll();
+                break;
+            case 4:
+                novainfra::log::shutdown();
+                break;
+        }
+        EXPECT_TRUE(destroyed.load());
+    }
+}
+
+TEST_F(RegistryTest, RetiredErrorHandlerCaptureMayReenterWriteOperations)
+{
+    struct ReentrantCapture {
+        explicit ReentrantCapture(bool &destroyed) : destroyed(destroyed) {}
+        ~ReentrantCapture()
+        {
+            novainfra::log::setAutoRegistration(true);
+            destroyed = true;
+        }
+        bool &destroyed;
+    };
+    bool destroyed = false;
+    auto capture = std::make_shared<ReentrantCapture>(destroyed);
+    novainfra::log::setErrHandler([capture](const std::string &) {});
+    capture.reset();
+    novainfra::log::setErrHandler({});
+    EXPECT_TRUE(destroyed);
+}
+
+
+TEST_F(RegistryTest, RetiredRegistryFormatterMayReenterWriteOperations)
+{
+    class ReentrantFormatter final : public novainfra::log::formatters::IFormatter
+    {
+    public:
+        explicit ReentrantFormatter(bool &destroyed) : destroyed_(destroyed) {}
+        ~ReentrantFormatter() override
+        {
+            novainfra::log::setAutoRegistration(true);
+            destroyed_ = true;
+        }
+        void format(const novainfra::log::details::LogMsg &, std::string &) override {}
+        std::unique_ptr<IFormatter> clone() const override
+        {
+            return std::make_unique<novainfra::log::formatters::PatternFormatter>();
+        }
+
+    private:
+        bool &destroyed_;
+    };
+    bool destroyed = false;
+    novainfra::log::setFormatter(std::make_unique<ReentrantFormatter>(destroyed));
+    novainfra::log::setFormatter(std::make_unique<novainfra::log::formatters::PatternFormatter>());
+    EXPECT_TRUE(destroyed);
 }
 
 }  // namespace

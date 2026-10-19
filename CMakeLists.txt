@@ -55,8 +55,34 @@ option(NOVAINFRA_PREVENT_CHILD_FD "Prevent child processes from inheriting log f
 option(NOVAINFRA_NO_THREAD_ID "Disable thread-id queries on log calls" OFF)
 option(NOVAINFRA_NO_TLS "Disable thread-local storage" OFF)
 option(NOVAINFRA_CLOCK_COARSE "Use CLOCK_REALTIME_COARSE" OFF)
+option(ENABLE_SANITIZERS "Legacy alias for NOVAINFRA_SANITIZER=ADDRESS" OFF)
+set(NOVAINFRA_SANITIZER "NONE" CACHE STRING "Sanitizer: NONE | ADDRESS (ASan+UBSan) | THREAD")
+set_property(CACHE NOVAINFRA_SANITIZER PROPERTY STRINGS NONE ADDRESS THREAD)
+
+if(ENABLE_SANITIZERS)
+    if(NOT NOVAINFRA_SANITIZER STREQUAL "NONE" AND NOT NOVAINFRA_SANITIZER STREQUAL "ADDRESS")
+        message(FATAL_ERROR "ENABLE_SANITIZERS cannot be combined with THREAD")
+    endif()
+
+    set(NOVAINFRA_SANITIZER "ADDRESS")
+endif()
+
+if(NOT NOVAINFRA_SANITIZER MATCHES "^(NONE|ADDRESS|THREAD)$")
+    message(FATAL_ERROR "Unknown NOVAINFRA_SANITIZER: ${NOVAINFRA_SANITIZER}")
+endif()
 
 add_subdirectory(modules/core)
+
+if(NOT NOVAINFRA_SANITIZER STREQUAL "NONE")
+    if(NOVAINFRA_SANITIZER STREQUAL "ADDRESS")
+        set(_novainfra_sanitize "-fsanitize=address,undefined")
+    else()
+        set(_novainfra_sanitize "-fsanitize=thread")
+    endif()
+
+    target_compile_options(novainfra_core INTERFACE "${_novainfra_sanitize}" -fno-omit-frame-pointer)
+    target_link_options(novainfra_core INTERFACE "${_novainfra_sanitize}")
+endif()
 
 if(MODULES_LOGGER_ENABLE)
     add_subdirectory(modules/logger)
