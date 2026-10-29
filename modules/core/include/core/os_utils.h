@@ -98,7 +98,7 @@ NOVAINFRA_CONSTEXPR static const char kFolderSeps[] = NOVAINFRA_FOLDER_SEPS;
 NOVAINFRA_CONSTEXPR static const Filename::value_type kFolderSepsFilename[] =
     NOVAINFRA_FILENAME(NOVAINFRA_FOLDER_SEPS);
 
-NOVAINFRA_INLINE std::string TrimedLeft(const std::string &s)
+NOVAINFRA_INLINE std::string trimLeft(const std::string &s)
 {
     size_t i = 0;
     while (i < s.size() && std::isspace(static_cast<unsigned char>(s[i])))
@@ -106,7 +106,7 @@ NOVAINFRA_INLINE std::string TrimedLeft(const std::string &s)
     return s.substr(i);
 }
 
-NOVAINFRA_INLINE std::string TrimedRight(const std::string &s)
+NOVAINFRA_INLINE std::string trimRight(const std::string &s)
 {
     size_t i = s.size();
     while (i > 0 && std::isspace(static_cast<unsigned char>(s[i - 1])))
@@ -114,22 +114,22 @@ NOVAINFRA_INLINE std::string TrimedRight(const std::string &s)
     return s.substr(0, i);
 }
 
-NOVAINFRA_INLINE std::string Trimed(const std::string &s)
+NOVAINFRA_INLINE std::string trim(const std::string &s)
 {
-    return TrimedRight(TrimedLeft(s));
+    return trimRight(trimLeft(s));
 }
 
-NOVAINFRA_INLINE SteadyTimePoint SteadyNowTime()
+NOVAINFRA_INLINE SteadyTimePoint steadyNowTime()
 {
     return std::chrono::steady_clock::now();
 }
 
-NOVAINFRA_INLINE Int64 ElapsedMs(SteadyTimePoint since)
+NOVAINFRA_INLINE Int64 elapsedMs(SteadyTimePoint since)
 {
     return std::chrono::duration_cast<Milliseconds>(std::chrono::steady_clock::now() - since).count();
 }
 
-NOVAINFRA_INLINE SystemClock::time_point Now() NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE SystemClock::time_point now() NOVAINFRA_NOEXCEPT
 {
 #if defined __linux__ && defined NOVAINFRA_CLOCK_COARSE
     timespec ts;
@@ -142,7 +142,7 @@ NOVAINFRA_INLINE SystemClock::time_point Now() NOVAINFRA_NOEXCEPT
     return SystemClock::now();
 #endif
 }
-NOVAINFRA_INLINE std::tm Localtime(const std::time_t &time_tt) NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE std::tm localTime(const std::time_t &time_tt) NOVAINFRA_NOEXCEPT
 {
 #ifdef _WIN32
     std::tm tm;
@@ -154,13 +154,13 @@ NOVAINFRA_INLINE std::tm Localtime(const std::time_t &time_tt) NOVAINFRA_NOEXCEP
     return tm;
 }
 
-NOVAINFRA_INLINE std::tm Localtime() NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE std::tm localTime() NOVAINFRA_NOEXCEPT
 {
     std::time_t now = ::time(nullptr);
-    return Localtime(now);
+    return localTime(now);
 }
 
-NOVAINFRA_INLINE std::tm Gmtime(const std::time_t &time_tt) NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE std::tm gmTime(const std::time_t &time_tt) NOVAINFRA_NOEXCEPT
 {
 #ifdef _WIN32
     std::tm tm;
@@ -172,14 +172,14 @@ NOVAINFRA_INLINE std::tm Gmtime(const std::time_t &time_tt) NOVAINFRA_NOEXCEPT
     return tm;
 }
 
-NOVAINFRA_INLINE std::tm Gmtime() NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE std::tm gmTime() NOVAINFRA_NOEXCEPT
 {
     std::time_t now_t = ::time(nullptr);
-    return Gmtime(now_t);
+    return gmTime(now_t);
 }
 
-// Fopen_s on non windows for writing
-NOVAINFRA_INLINE bool Fopen_s(FILE **fp, const Filename &filename, const Filename &mode)
+// openFile on non windows for writing
+NOVAINFRA_INLINE bool openFile(FILE **fp, const Filename &filename, const Filename &mode)
 {
 #ifdef _WIN32
 #  ifdef NOVAINFRA_WCHAR_FILENAMES
@@ -215,7 +215,7 @@ NOVAINFRA_INLINE bool Fopen_s(FILE **fp, const Filename &filename, const Filenam
     return *fp == nullptr;
 }
 
-NOVAINFRA_INLINE int Remove(const Filename &filename) NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE int removeFile(const Filename &filename) NOVAINFRA_NOEXCEPT
 {
 #if defined(_WIN32) && defined(NOVAINFRA_WCHAR_FILENAMES)
     return ::_wremove(filename.c_str());
@@ -224,15 +224,15 @@ NOVAINFRA_INLINE int Remove(const Filename &filename) NOVAINFRA_NOEXCEPT
 #endif
 }
 
-NOVAINFRA_INLINE int RemoveIfExists(const Filename &filename) NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE int removeIfExists(const Filename &filename) NOVAINFRA_NOEXCEPT
 {
-    if (Remove(filename) == 0)
+    if (removeFile(filename) == 0)
         return 0;
 
     return (errno == ENOENT) ? 0 : -1;
 }
 
-NOVAINFRA_INLINE int Rename(const Filename &filename1, const Filename &filename2) NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE int renameFile(const Filename &filename1, const Filename &filename2) NOVAINFRA_NOEXCEPT
 {
 #if defined(_WIN32) && defined(NOVAINFRA_WCHAR_FILENAMES)
     return ::_wrename(filename1.c_str(), filename2.c_str());
@@ -242,7 +242,7 @@ NOVAINFRA_INLINE int Rename(const Filename &filename1, const Filename &filename2
 }
 
 // Return true if path exists (file or directory)
-NOVAINFRA_INLINE bool PathExists(const Filename &filename) NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE bool pathExists(const Filename &filename) NOVAINFRA_NOEXCEPT
 {
 #ifdef _WIN32
     struct _stat buffer;
@@ -258,13 +258,13 @@ NOVAINFRA_INLINE bool PathExists(const Filename &filename) NOVAINFRA_NOEXCEPT
 }
 
 #ifdef _MSC_VER
-// avoid warning about unreachable statement at the end of Filesize()
+// avoid warning about unreachable statement at the end of fileSize()
 #  pragma warning(push)
 #  pragma warning(disable : 4702)
 #endif
 
 // Return file size according to open FILE* object
-NOVAINFRA_INLINE size_t Filesize(FILE *f)
+NOVAINFRA_INLINE size_t fileSize(FILE *f)
 {
     if (f == nullptr) {
         NOVAINFRA_THROW(std::runtime_error("Failed getting file size. fd is null"));
@@ -317,7 +317,7 @@ NOVAINFRA_INLINE size_t Filesize(FILE *f)
 #if !defined(NOVAINFRA_NO_TZ_OFFSET)
 #  ifdef _WIN32
 // Compare the timestamp as Local (mktime) vs UTC (_mkgmtime) to get the offset.
-NOVAINFRA_INLINE int UtcMinutesOffset(const std::tm &tm)
+NOVAINFRA_INLINE int utcMinutesOffset(const std::tm &tm)
 {
     std::tm local_tm = tm;  // copy since mktime might adjust it (normalize dates, set tm_isdst)
     std::time_t local_time_t = std::mktime(&local_tm);
@@ -334,7 +334,7 @@ NOVAINFRA_INLINE int UtcMinutesOffset(const std::tm &tm)
 }
 #  else
 // On unix simply use tm_gmtoff
-NOVAINFRA_INLINE int UtcMinutesOffset(const std::tm &tm)
+NOVAINFRA_INLINE int utcMinutesOffset(const std::tm &tm)
 {
     return static_cast<int>(tm.tm_gmtoff / 60);
 }
@@ -344,7 +344,7 @@ NOVAINFRA_INLINE int UtcMinutesOffset(const std::tm &tm)
 // Return current thread id as size_t
 // It exists because the std::this_thread::get_id() is much slower(especially
 // under VS 2013)
-NOVAINFRA_INLINE size_t _ThreadId() NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE size_t rawThreadId() NOVAINFRA_NOEXCEPT
 {
 #ifdef _WIN32
     return static_cast<size_t>(::GetCurrentThreadId());
@@ -396,19 +396,19 @@ NOVAINFRA_INLINE size_t _ThreadId() NOVAINFRA_NOEXCEPT
 }
 
 // Return current thread id as size_t (from thread local storage)
-NOVAINFRA_INLINE size_t ThreadId() NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE size_t threadId() NOVAINFRA_NOEXCEPT
 {
 #if defined(NOVAINFRA_NO_TLS)
-    return _ThreadId();
+    return rawThreadId();
 #else  // cache thread id in tls
-    static thread_local const size_t tid = _ThreadId();
+    static thread_local const size_t tid = rawThreadId();
     return tid;
 #endif
 }
 
 // This is avoid msvc issue in sleep_for that happens if the clock changes.
 // See https://github.com/gabime/spdlog/issues/609
-NOVAINFRA_INLINE void SleepForMillis(unsigned int milliseconds) NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE void sleepForMillis(unsigned int milliseconds) NOVAINFRA_NOEXCEPT
 {
 #if defined(_WIN32)
     ::Sleep(milliseconds);
@@ -419,7 +419,7 @@ NOVAINFRA_INLINE void SleepForMillis(unsigned int milliseconds) NOVAINFRA_NOEXCE
 
 // wchar support for windows file names (NOVAINFRA_WCHAR_FILENAMES must be defined)
 #if defined(_WIN32) && defined(NOVAINFRA_WCHAR_FILENAMES)
-NOVAINFRA_INLINE std::string FilenameToStr(const Filename &filename)
+NOVAINFRA_INLINE std::string filenameToStr(const Filename &filename)
 {
     if (filename.empty()) {
         return std::string();
@@ -434,13 +434,13 @@ NOVAINFRA_INLINE std::string FilenameToStr(const Filename &filename)
     return result;
 }
 #else
-NOVAINFRA_INLINE std::string FilenameToStr(const Filename &filename)
+NOVAINFRA_INLINE std::string filenameToStr(const Filename &filename)
 {
     return filename;
 }
 #endif
 
-NOVAINFRA_INLINE int Pid() NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE int pid() NOVAINFRA_NOEXCEPT
 {
 #ifdef _WIN32
     return conditional_static_cast<int>(::GetCurrentProcessId());
@@ -449,7 +449,7 @@ NOVAINFRA_INLINE int Pid() NOVAINFRA_NOEXCEPT
 #endif
 }
 
-NOVAINFRA_INLINE bool IsColorTerminal() NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE bool isColorTerminal() NOVAINFRA_NOEXCEPT
 {
 #ifdef _WIN32
     return true;
@@ -481,7 +481,7 @@ NOVAINFRA_INLINE bool IsColorTerminal() NOVAINFRA_NOEXCEPT
 
 // Determine if the terminal attached
 // Source: https://github.com/agauniyal/rang/
-NOVAINFRA_INLINE bool InTerminal(FILE *file) NOVAINFRA_NOEXCEPT
+NOVAINFRA_INLINE bool inTerminal(FILE *file) NOVAINFRA_NOEXCEPT
 {
 #ifdef _WIN32
     return ::_isatty(_fileno(file)) != 0;
@@ -491,7 +491,7 @@ NOVAINFRA_INLINE bool InTerminal(FILE *file) NOVAINFRA_NOEXCEPT
 }
 
 #if (defined(NOVAINFRA_WCHAR_TO_UTF8_SUPPORT) || defined(NOVAINFRA_WCHAR_FILENAMES)) && defined(_WIN32)
-NOVAINFRA_INLINE void WstrToUtf8buf(wstring_view_t wstr, std::string &target)
+NOVAINFRA_INLINE void wstrToUtf8Buf(wstring_view_t wstr, std::string &target)
 {
     if (wstr.size() > static_cast<size_t>((std::numeric_limits<int>::max)()) / 4 - 1) {
         NOVAINFRA_THROW(std::runtime_error("UTF-16 string is too big to be converted to UTF-8"));
@@ -521,7 +521,7 @@ NOVAINFRA_INLINE void WstrToUtf8buf(wstring_view_t wstr, std::string &target)
                                        std::to_string(::GetLastError())));
 }
 
-NOVAINFRA_INLINE void Utf8ToWstrbuf(string_view_t str, std::wstring &target)
+NOVAINFRA_INLINE void utf8ToWstrBuf(string_view_t str, std::wstring &target)
 {
     if (str.size() > static_cast<size_t>((std::numeric_limits<int>::max)()) - 1) {
         NOVAINFRA_THROW(std::runtime_error("UTF-8 string is too big to be converted to UTF-16"));
@@ -552,7 +552,7 @@ NOVAINFRA_INLINE void Utf8ToWstrbuf(string_view_t str, std::wstring &target)
         // defined(_WIN32)
 
 // return true on success
-static NOVAINFRA_INLINE bool Mkdir(const Filename &path)
+static NOVAINFRA_INLINE bool makeDir(const Filename &path)
 {
 #ifdef _WIN32
 #  ifdef NOVAINFRA_WCHAR_FILENAMES
@@ -567,9 +567,9 @@ static NOVAINFRA_INLINE bool Mkdir(const Filename &path)
 
 // create the given directory - and all directories leading to it
 // return true on success or if the directory already exists
-NOVAINFRA_INLINE bool CreateDir(const Filename &path)
+NOVAINFRA_INLINE bool createDir(const Filename &path)
 {
-    if (PathExists(path)) {
+    if (pathExists(path)) {
         return true;
     }
 
@@ -596,7 +596,7 @@ NOVAINFRA_INLINE bool CreateDir(const Filename &path)
         }
 #endif
 
-        if (!subdir.empty() && !PathExists(subdir) && !Mkdir(subdir)) {
+        if (!subdir.empty() && !pathExists(subdir) && !makeDir(subdir)) {
             if (errno != EEXIST) {
                 return false;  // return error if failed creating dir
             }
@@ -612,7 +612,7 @@ NOVAINFRA_INLINE bool CreateDir(const Filename &path)
 // "abc/" => "abc"
 // "abc" => ""
 // "abc///" => "abc//"
-NOVAINFRA_INLINE Filename DirName(const Filename &path)
+NOVAINFRA_INLINE Filename dirName(const Filename &path)
 {
     auto pos = path.find_last_of(kFolderSepsFilename);
     return pos != Filename::npos ? path.substr(0, pos) : Filename{};
@@ -622,7 +622,7 @@ NOVAINFRA_INLINE Filename DirName(const Filename &path)
 #  pragma warning(push)
 #  pragma warning(disable : 4996)
 #endif  // _MSC_VER
-std::string NOVAINFRA_INLINE Getenv(const char *field)
+std::string NOVAINFRA_INLINE getEnv(const char *field)
 {
 #if defined(_MSC_VER) && defined(WINAPI_FAMILY) && defined(WINAPI_FAMILY_DESKTOP_APP) &&                     \
     (WINAPI_FAMILY != WINAPI_FAMILY_DESKTOP_APP)
@@ -638,7 +638,7 @@ std::string NOVAINFRA_INLINE Getenv(const char *field)
 
 // Do fsync by FILE handlerpointer
 // Return true on success
-NOVAINFRA_INLINE bool Fsync(FILE *fp)
+NOVAINFRA_INLINE bool fsyncFile(FILE *fp)
 {
 #ifdef _WIN32
     return FlushFileBuffers(reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(fp)))) != 0;
@@ -649,7 +649,7 @@ NOVAINFRA_INLINE bool Fsync(FILE *fp)
 
 // Do non-locking fwrite if possible by the os or use the regular locking fwrite
 // Return true on success.
-NOVAINFRA_INLINE bool FwriteBytes(const void *ptr, const size_t n_bytes, FILE *fp)
+NOVAINFRA_INLINE bool writeBytes(const void *ptr, const size_t n_bytes, FILE *fp)
 {
 #if defined(_WIN32) && defined(NOVAINFRA_FWRITE_UNLOCKED)
     return _fwrite_nolock(ptr, 1, n_bytes, fp) == n_bytes;

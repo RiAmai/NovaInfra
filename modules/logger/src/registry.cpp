@@ -212,7 +212,7 @@ std::shared_ptr<Logger> Registry::defaultLogger() const NOVAINFRA_NOEXCEPT
     return std::atomic_load_explicit(&defaultLogger_, std::memory_order_acquire);
 }
 
-std::shared_ptr<Logger> Registry::getNameLogger(const std::string &name) const
+std::shared_ptr<Logger> Registry::findLogger(const std::string &name) const
 {
     std::lock_guard<std::mutex> lock(mutex_);
     const auto it = loggers_.find(name);

@@ -11,7 +11,7 @@ int main(int argc, char **argv)
     const std::string path = argc > 1 ? argv[1] : "sqlite_pool_example.db";
     NOVAINFRA_TRY
     {
-        novainfra::sqlitepool::PoolConfig config;
+        novainfra::sqlitepool::PoolOptions config;
         config.readConnections = 2;
         config.pageCacheSize = -2048;  // KiB per connection, allocated on demand.
         config.pragmas.emplace_back("foreign_keys=ON");

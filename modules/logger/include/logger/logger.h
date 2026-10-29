@@ -1,12 +1,12 @@
 #pragma once
 
-#include <logger/details/error_handling.h>
-#include <logger/details/format_traits.h>
-#include <logger/details/level_storage.h>
-#include <logger/details/log_buffer.h>
-#include <logger/details/backtracer.h>
+#include <logger/detail/error_handling.h>
+#include <logger/detail/format_traits.h>
+#include <logger/detail/level_storage.h>
+#include <logger/detail/log_buffer.h>
+#include <logger/detail/backtracer.h>
 #include <logger/sinks/sink.h>
-#include <logger/details/log_msg.h>
+#include <logger/detail/log_msg.h>
 #include <core/os_utils.h>
 
 #include <fmt/format.h>
@@ -39,14 +39,14 @@ public:
     const std::string &name() const { return name_; }
 
     void setLevel(Level level) { level_.store(level); }
-    Level level() const { return static_cast<Level>(level_.load(std::memory_order_relaxed)); }
+    Level level() const { return level_.load(std::memory_order_relaxed); }
     bool shouldLog(Level level) const
     {
         return (level >= level_.load(std::memory_order_relaxed)) && (level != Level::OFF);
     }
 
     void setFlushLevel(Level level) { flushLevel_.store(level); }
-    Level flushLevel() const { return static_cast<Level>(flushLevel_.load(std::memory_order_relaxed)); }
+    Level flushLevel() const { return flushLevel_.load(std::memory_order_relaxed); }
     bool shouldFlush(Level level) const { return (level >= flushLevel()) && (level != Level::OFF); }
 
     const std::vector<sinks::SinkPtr> &sinks() const { return sinks_; }
@@ -56,7 +56,7 @@ public:
     void disableBacktrace() { tracer_.disable(); }
     void dumpBacktrace()
     {
-        using details::LogMsg;
+        using detail::LogMsg;
         if (!tracer_.enabled()) {
             return;
         }
@@ -126,7 +126,7 @@ public:
     }
 
     // T cannot be statically converted to format string (including string_view/wstring_view)
-    template <class T, typename std::enable_if<!details::IsConvertibleToAnyFormatString<const T &>::value,
+    template <class T, typename std::enable_if<!detail::IsConvertibleToAnyFormatString<const T &>::value,
                                                int>::type = 0>
     void log(SourceLocation source, Level level, const T &msg)
     {
@@ -141,10 +141,10 @@ public:
 
         NOVAINFRA_TRY
         {
-            details::LogMsg logMsg{logTime, source, name_, level, msg};
+            detail::LogMsg logMsg{logTime, source, name_, level, msg};
             logIt(logMsg);
         }
-        NOVAINFRA_LOG_DETAILS_CATCH(source)
+        NOVAINFRA_LOG_DETAIL_CATCH(source)
     }
 
     void log(SourceLocation source, Level level, std::string_view msg)
@@ -155,10 +155,10 @@ public:
 
         NOVAINFRA_TRY
         {
-            details::LogMsg logMsg{source, name_, level, msg};
+            detail::LogMsg logMsg{source, name_, level, msg};
             logIt(logMsg);
         }
-        NOVAINFRA_LOG_DETAILS_CATCH(source)
+        NOVAINFRA_LOG_DETAIL_CATCH(source)
     }
 
     void log(Level level, std::string_view msg) { log(SourceLocation{}, level, msg); }
@@ -257,13 +257,13 @@ protected:
 
         NOVAINFRA_TRY
         {
-            details::LogMemoryBuffer message;
+            detail::LogMemoryBuffer message;
             fmt::vformat_to(fmt::appender(message), fmt::string_view(format.data(), format.size()),
                             fmt::make_format_args(args...));
-            details::LogMsg msg{source, name_, level, std::string_view(message.data(), message.size())};
+            detail::LogMsg msg{source, name_, level, std::string_view(message.data(), message.size())};
             logIt(msg);
         }
-        NOVAINFRA_LOG_DETAILS_CATCH(source)
+        NOVAINFRA_LOG_DETAIL_CATCH(source)
     }
     void errHandler(const std::string &msg) NOVAINFRA_NOEXCEPT;
 
@@ -271,7 +271,7 @@ protected:
     {
         return level != Level::OFF && (shouldLog(level) || tracer_.enabled());
     }
-    void logIt(const details::LogMsg &msg)
+    void logIt(const detail::LogMsg &msg)
     {
         if (tracer_.enabled()) {
             tracer_.pushBack(msg);
@@ -281,7 +281,7 @@ protected:
         }
     }
 
-    virtual void sinkIt(const details::LogMsg &msg);
+    virtual void sinkIt(const detail::LogMsg &msg);
     virtual void _flush();
 
     void validateSinks() const;
@@ -291,17 +291,17 @@ protected:
 #ifdef NOVAINFRA_NO_THREAD_ID
         return 0;
 #else
-        return core::ThreadId();
+        return core::threadId();
 #endif
     }
 
     std::string name_;
-    details::LevelType level_{Level::TRACE};
-    details::LevelType flushLevel_{Level::OFF};
+    detail::LevelType level_{Level::TRACE};
+    detail::LevelType flushLevel_{Level::OFF};
     std::vector<sinks::SinkPtr> sinks_;
     // Read and replace through the atomic shared_ptr free functions in logger.cpp.
     std::shared_ptr<const ErrHandler> cstErrHandler_;
-    details::BackTracer tracer_;
+    detail::BackTracer tracer_;
 };
 }  // namespace log
 NOVAINFRA_NAMESPACE_END

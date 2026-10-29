@@ -15,10 +15,10 @@ namespace detail {
 
 namespace {
 struct DispatchScope {
-    explicit DispatchScope(const void *owner) noexcept : owner(owner), previous(current) { current = this; }
+    explicit DispatchScope(const void *owner) NOVAINFRA_NOEXCEPT : owner(owner), previous(current) { current = this; }
     ~DispatchScope() { current = previous; }
 
-    static bool contains(const void *owner) noexcept
+    static bool contains(const void *owner) NOVAINFRA_NOEXCEPT
     {
         for (auto scope = current; scope; scope = scope->previous) {
             if (scope->owner == owner) {
@@ -330,13 +330,13 @@ void State::shutdown(ShutdownMode mode)
     impl_->idle.wait(lock, [this] { return impl_->stats.queued == 0 && impl_->stats.active == 0; });
 }
 
-bool State::accepting() const noexcept
+bool State::accepting() const NOVAINFRA_NOEXCEPT
 {
     std::lock_guard<std::mutex> lock(impl_->mutex);
     return impl_->accepting;
 }
 
-EventBusStats State::stats() const noexcept
+EventBusStats State::stats() const NOVAINFRA_NOEXCEPT
 {
     std::lock_guard<std::mutex> lock(impl_->mutex);
     return impl_->stats;
@@ -345,7 +345,7 @@ EventBusStats State::stats() const noexcept
 }  // namespace detail
 
 EventBus::EventBus(EventBusOptions options) : state_(std::make_shared<detail::State>(std::move(options))) {}
-EventBus::~EventBus() noexcept
+EventBus::~EventBus() NOVAINFRA_NOEXCEPT
 {
     if (state_) {
         NOVAINFRA_TRY
@@ -360,11 +360,11 @@ void EventBus::shutdown(ShutdownMode mode)
     const auto state = state_;
     state->shutdown(mode);
 }
-bool EventBus::accepting() const noexcept
+bool EventBus::accepting() const NOVAINFRA_NOEXCEPT
 {
     return state_->accepting();
 }
-EventBusStats EventBus::stats() const noexcept
+EventBusStats EventBus::stats() const NOVAINFRA_NOEXCEPT
 {
     return state_->stats();
 }

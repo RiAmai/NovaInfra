@@ -1,4 +1,4 @@
-#include <logger/details/file_assistant.h>
+#include <logger/detail/file_assistant.h>
 #include <core/os_utils.h>
 
 #include <cerrno>
@@ -8,7 +8,7 @@
 #include <utility>
 
 NOVAINFRA_NAMESPACE_BEGIN
-namespace log::details {
+namespace log::detail {
 
 FileAssistant::~FileAssistant() NOVAINFRA_NOEXCEPT
 {
@@ -19,7 +19,7 @@ void FileAssistant::ensureOpen(const char *operation) const
 {
     if (fd_ == nullptr) {
         NOVAINFRA_THROW(std::runtime_error(std::string("Cannot ") + operation + " closed file " +
-                                           core::FilenameToStr(filename_)));
+                                           core::filenameToStr(filename_)));
     }
 }
 
@@ -48,15 +48,15 @@ void FileAssistant::open(const Filename &fname, bool truncate)
     }
     for (int tries = 0; tries < openTries_; ++tries) {
         // create containing folder if not exists already.
-        core::CreateDir(core::DirName(fname));
+        core::createDir(core::dirName(fname));
         if (truncate) {
             std::FILE *tmp;
-            if (core::Fopen_s(&tmp, fname, truncMode)) {
+            if (core::openFile(&tmp, fname, truncMode)) {
                 continue;
             }
             std::fclose(tmp);
         }
-        if (!core::Fopen_s(&fd_, fname, mode)) {
+        if (!core::openFile(&fd_, fname, mode)) {
             if (eventHandlers_.afterOpen) {
                 NOVAINFRA_TRY
                 {
@@ -71,12 +71,12 @@ void FileAssistant::open(const Filename &fname, bool truncate)
             return;
         }
 
-        core::SleepForMillis(openInterval_);
+        core::sleepForMillis(openInterval_);
     }
 
     NOVAINFRA_THROW(
         std::system_error(std::error_code(errno, std::generic_category()),
-                          "Failed opening file " + core::FilenameToStr(filename_) + " for writing"));
+                          "Failed opening file " + core::filenameToStr(filename_) + " for writing"));
 }
 
 void FileAssistant::reopen(bool truncate)
@@ -92,16 +92,16 @@ void FileAssistant::flush()
     ensureOpen("flush");
     if (std::fflush(fd_) != 0) {
         NOVAINFRA_THROW(std::system_error(std::error_code(errno, std::generic_category()),
-                                          "Failed flush to file " + core::FilenameToStr(filename_)));
+                                          "Failed flush to file " + core::filenameToStr(filename_)));
     }
 }
 
 void FileAssistant::sync()
 {
     ensureOpen("sync");
-    if (!core::Fsync(fd_)) {
+    if (!core::fsyncFile(fd_)) {
         NOVAINFRA_THROW(std::system_error(std::error_code(errno, std::generic_category()),
-                                          "Failed to fsync file " + core::FilenameToStr(filename_)));
+                                          "Failed to fsync file " + core::filenameToStr(filename_)));
     }
 }
 
@@ -141,7 +141,7 @@ void FileAssistant::close()
     }
     if (closeResult != 0) {
         NOVAINFRA_THROW(std::system_error(std::error_code(closeError, std::generic_category()),
-                                          "Failed closing file " + core::FilenameToStr(filename_)));
+                                          "Failed closing file " + core::filenameToStr(filename_)));
     }
 }
 
@@ -151,16 +151,16 @@ void FileAssistant::write(const std::string &buf)
     size_t msgSize = buf.size();
     auto data = buf.data();
 
-    if (!core::FwriteBytes(data, msgSize, fd_)) {
+    if (!core::writeBytes(data, msgSize, fd_)) {
         NOVAINFRA_THROW(std::system_error(std::error_code(errno, std::generic_category()),
-                                          "Failed writing to file " + core::FilenameToStr(filename_)));
+                                          "Failed writing to file " + core::filenameToStr(filename_)));
     }
 }
 
 size_t FileAssistant::size() const
 {
     ensureOpen("get size of");
-    return core::Filesize(fd_);
+    return core::fileSize(fd_);
 }
 
 std::tuple<Filename, Filename> FileAssistant::splitByExtension(const Filename &fname)
@@ -179,5 +179,5 @@ std::tuple<Filename, Filename> FileAssistant::splitByExtension(const Filename &f
     return std::make_tuple(fname.substr(0, extIndex), fname.substr(extIndex));
 }
 
-}  // namespace log::details
+}  // namespace log::detail
 NOVAINFRA_NAMESPACE_END

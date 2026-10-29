@@ -8,17 +8,17 @@ namespace sqlitepool {
 
 WriteConn::WriteConn(sqlite3 *db, std::shared_ptr<void> lease) : db_(db), lease_(std::move(lease)) {}
 
-WriteConn::WriteConn(WriteConn &&o) NOVAINFRA_NOEXCEPT : db_(o.db_), lease_(std::move(o.lease_))
+WriteConn::WriteConn(WriteConn &&other) NOVAINFRA_NOEXCEPT : db_(other.db_), lease_(std::move(other.lease_))
 {
-    o.db_ = nullptr;
+    other.db_ = nullptr;
 }
 
-WriteConn &WriteConn::operator=(WriteConn &&o) NOVAINFRA_NOEXCEPT
+WriteConn &WriteConn::operator=(WriteConn &&other) NOVAINFRA_NOEXCEPT
 {
-    if (this != &o) {
-        db_ = o.db_;
-        lease_ = std::move(o.lease_);
-        o.db_ = nullptr;
+    if (this != &other) {
+        db_ = other.db_;
+        lease_ = std::move(other.lease_);
+        other.db_ = nullptr;
     }
     return *this;
 }

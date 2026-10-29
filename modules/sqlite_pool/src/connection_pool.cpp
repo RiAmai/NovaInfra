@@ -60,7 +60,7 @@ struct WriteLease {
 };
 }  // namespace
 
-ConnectionPool::ConnectionPool(const std::string &path, PoolConfig config)
+ConnectionPool::ConnectionPool(const std::string &path, PoolOptions config)
     : path_(path), config_(std::move(config)), state_(std::make_shared<PoolState>())
 {
     if (config_.readConnections == 0) {
@@ -123,8 +123,8 @@ sqlite3 *ConnectionPool::openDb(bool readonly)
 
 void ConnectionPool::applyConfig(sqlite3 *db, bool isWriter)
 {
-    if (config_.postOpen) {
-        config_.postOpen(db, isWriter);
+    if (config_.onPostOpen) {
+        config_.onPostOpen(db, isWriter);
     }
     if (sqlite3_busy_timeout(db, config_.busyTimeoutMs) != SQLITE_OK) {
         NOVAINFRA_THROW(SqliteError("busy_timeout"));
@@ -217,7 +217,7 @@ HealthCheckResult ConnectionPool::checkHealth()
     std::lock_guard<std::mutex> runLock(healthMtx_);
     HealthCheckResult result;
 
-    // Reserve one idle slot at a time. Probe/open/postOpen can be slow and
+    // Reserve one idle slot at a time. Probe/open/onPostOpen can be slow and
     // must not hold the mutex used by all readers and lease destructors.
     for (Size i = 0; i < state_->readDbs.size(); ++i) {
         sqlite3 *db = nullptr;

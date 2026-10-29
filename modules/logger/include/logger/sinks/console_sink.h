@@ -1,6 +1,6 @@
 #pragma once
 
-#include <logger/details/mutex.h>
+#include <logger/detail/mutex.h>
 #include <logger/formatters/pattern_formatter.h>
 #include <logger/sinks/sink.h>
 
@@ -16,7 +16,7 @@ template <typename MutexOrPolicy>
 class ConsoleOutSink : public ISink
 {
 public:
-    using MutexTraits = details::ConsoleMutexTraits<MutexOrPolicy>;
+    using MutexTraits = detail::ConsoleMutexTraits<MutexOrPolicy>;
     using Mutex = typename MutexTraits::Mutex;
     explicit ConsoleOutSink()
         : mutex_(MutexTraits::mutex()), formatter_(std::make_unique<formatters::PatternFormatter>())
@@ -25,7 +25,7 @@ public:
     ~ConsoleOutSink() NOVAINFRA_OVERRIDE = default;
     NOVAINFRA_DISABLE_COPY_MOVE(ConsoleOutSink<MutexOrPolicy>)
 
-    void log(const details::LogMsg &msg) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
+    void log(const detail::LogMsg &msg) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
         std::lock_guard<Mutex> lock(mutex_);
         _log(msg);
@@ -54,11 +54,11 @@ public:
 
     bool isThreadSafe() const NOVAINFRA_NOEXCEPT NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
-        return !std::is_same<Mutex, details::NullMutex>::value;
+        return !std::is_same<Mutex, detail::NullMutex>::value;
     }
 
 protected:
-    void _log(const details::LogMsg &msg)
+    void _log(const detail::LogMsg &msg)
     {
         const auto &dstStr = this->formatMessage(msg);
         FILE *file;
@@ -67,7 +67,7 @@ protected:
         } else {
             file = stderr;
         }
-        if (!core::FwriteBytes(dstStr.data(), dstStr.size(), file)) {
+        if (!core::writeBytes(dstStr.data(), dstStr.size(), file)) {
             NOVAINFRA_THROW(std::runtime_error("Failed writing log message to console"));
         }
     }
@@ -84,7 +84,7 @@ protected:
         }
     }
 
-    const std::string &formatMessage(const details::LogMsg &msg)
+    const std::string &formatMessage(const detail::LogMsg &msg)
     {
         formattedBuffer_.clear();
         formatter_->format(msg, formattedBuffer_);
@@ -101,8 +101,8 @@ protected:
     std::string formattedBuffer_;
 };
 
-using ConsoleOutSinkMt = ConsoleOutSink<details::ConsoleMutex>;
-using ConsoleOutSinkSt = ConsoleOutSink<details::ConsoleNullMutex>;
+using ConsoleOutSinkMt = ConsoleOutSink<detail::ConsoleMutex>;
+using ConsoleOutSinkSt = ConsoleOutSink<detail::ConsoleNullMutex>;
 
 }  // namespace log::sinks
 NOVAINFRA_NAMESPACE_END

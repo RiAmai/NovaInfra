@@ -207,8 +207,8 @@ endif()
 set(NOVAINFRA_SQLITE_DEPENDENCY "${NOVAINFRA_SQLITE_DEPENDENCY}" PARENT_SCOPE)
 set(NOVAINFRA_SQLITE_CRYPTO_DEPENDENCY "${NOVAINFRA_SQLITE_CRYPTO_DEPENDENCY}" PARENT_SCOPE)
 
-# -- Propagate the SQLITEPOOL_USE_SQLCIPHER definition to the pool -
-# Pool code can use #ifdef SQLITEPOOL_USE_SQLCIPHER to
+# -- Propagate the NOVAINFRA_SQLITE_POOL_USE_SQLCIPHER definition to the pool -
+# Pool code can use #ifdef NOVAINFRA_SQLITE_POOL_USE_SQLCIPHER to
 # add behavior specific to the encryption algorithm.
 if(_use_cipher)
     message(STATUS "sqlite_pool: encryption ENABLED (SQLiteCipher)")
@@ -217,38 +217,38 @@ else()
 endif()
 
 # pool library
-file(GLOB SQLITEPOOL_SRCS "src/*.cpp")
+file(GLOB SQLITE_POOL_SRCS "src/*.cpp")
 
-add_library(novainfra_sqlitepool ${SQLITEPOOL_SRCS})
-add_library(NovaInfra::SqlitePool ALIAS novainfra_sqlitepool)
-target_compile_features(novainfra_sqlitepool PUBLIC cxx_std_17)
-target_include_directories(novainfra_sqlitepool PUBLIC
+add_library(novainfra_sqlite_pool ${SQLITE_POOL_SRCS})
+add_library(NovaInfra::SqlitePool ALIAS novainfra_sqlite_pool)
+target_compile_features(novainfra_sqlite_pool PUBLIC cxx_std_17)
+target_include_directories(novainfra_sqlite_pool PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_link_libraries(novainfra_sqlitepool PUBLIC NovaInfra::Core "${_sqlite_target}" ${_sqlite_link_libraries})
+target_link_libraries(novainfra_sqlite_pool PUBLIC NovaInfra::Core "${_sqlite_target}" ${_sqlite_link_libraries})
 
 if(_sqlite_include_dirs)
-    target_include_directories(novainfra_sqlitepool PUBLIC ${_sqlite_include_dirs})
+    target_include_directories(novainfra_sqlite_pool PUBLIC ${_sqlite_include_dirs})
 endif()
 
 if(_sqlite_link_directories)
-    target_link_directories(novainfra_sqlitepool PUBLIC ${_sqlite_link_directories})
+    target_link_directories(novainfra_sqlite_pool PUBLIC ${_sqlite_link_directories})
 endif()
 
-set_target_properties(novainfra_sqlitepool PROPERTIES EXPORT_NAME SqlitePool)
+set_target_properties(novainfra_sqlite_pool PROPERTIES EXPORT_NAME SqlitePool)
 
 if(_use_cipher)
-    target_compile_definitions(novainfra_sqlitepool PUBLIC SQLITEPOOL_USE_SQLCIPHER)
+    target_compile_definitions(novainfra_sqlite_pool PUBLIC NOVAINFRA_SQLITE_POOL_USE_SQLCIPHER)
 endif()
 
 if(NOT WIN32)
     find_package(Threads REQUIRED)
-    target_link_libraries(novainfra_sqlitepool PUBLIC Threads::Threads)
+    target_link_libraries(novainfra_sqlite_pool PUBLIC Threads::Threads)
 endif()
 
 # install rules
-install(TARGETS novainfra_sqlitepool
+install(TARGETS novainfra_sqlite_pool
     EXPORT NovaInfraTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -262,8 +262,8 @@ if(NOVAINFRA_SQLITE_POOL_BUILD_EXAMPLES)
 endif()
 
 if(NOVAINFRA_SQLITE_POOL_BUILD_BENCHMARKS)
-    add_executable(novainfra_sqlitepool_benchmarks benchmarks/sqlite_pool_benchmarks.cpp)
-    target_link_libraries(novainfra_sqlitepool_benchmarks PRIVATE NovaInfra::SqlitePool Threads::Threads)
+    add_executable(novainfra_sqlite_pool_benchmarks benchmarks/sqlite_pool_benchmarks.cpp)
+    target_link_libraries(novainfra_sqlite_pool_benchmarks PRIVATE NovaInfra::SqlitePool Threads::Threads)
 endif()
 
 if(BUILD_TESTING AND PROJECT_IS_TOP_LEVEL)

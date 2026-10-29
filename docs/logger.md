@@ -398,7 +398,7 @@ diagnostics->trace("name-specific level override");
 
 - `defaultLogger()`：取得当前默认 Logger 的 `shared_ptr` 快照
 - `setDefaultLogger()`：设置并注册默认 Logger
-- `getNameLogger()`：按名称查询 Logger
+- `findLogger()`：按名称查询 Logger
 - `registerLogger()`：注册新名称，名称重复时报错
 - `registerOrReplaceLogger()`：注册或替换同名 Logger
 - `setLevel()` / `setLevels()`：设置全局级别或名称级别覆盖

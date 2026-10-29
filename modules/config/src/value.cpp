@@ -104,7 +104,7 @@ void dumpValue(std::ostringstream &out, const Value &value, bool redact)
 }
 }  // namespace
 
-Value::Type Value::type() const noexcept
+Value::Type Value::type() const NOVAINFRA_NOEXCEPT
 {
     switch (storage_.index()) {
         case 1:
@@ -126,12 +126,12 @@ Value::Type Value::type() const noexcept
     }
 }
 
-bool Value::isScalar() const noexcept
+bool Value::isScalar() const NOVAINFRA_NOEXCEPT
 {
     return type() != Type::ARRAY && type() != Type::OBJECT;
 }
 
-const Value *Value::find(const std::string &path) const noexcept
+const Value *Value::find(const std::string &path) const NOVAINFRA_NOEXCEPT
 {
     const Value *current = this;
     for (const auto &part : parts(path)) {
@@ -146,7 +146,7 @@ const Value *Value::find(const std::string &path) const noexcept
     return current;
 }
 
-Value *Value::find(const std::string &path) noexcept
+Value *Value::find(const std::string &path) NOVAINFRA_NOEXCEPT
 {
     return const_cast<Value *>(static_cast<const Value &>(*this).find(path));
 }

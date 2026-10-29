@@ -194,7 +194,7 @@ TEST(LoggerBaseline, CapturesConfiguredNumericThreadId)
 #ifdef NOVAINFRA_NO_THREAD_ID
     EXPECT_EQ(sink->lastMessage.threadId, 0U);
 #else
-    EXPECT_EQ(sink->lastMessage.threadId, novainfra::core::ThreadId());
+    EXPECT_EQ(sink->lastMessage.threadId, novainfra::core::threadId());
 #endif
 }
 

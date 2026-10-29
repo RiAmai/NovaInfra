@@ -21,7 +21,7 @@ class ScopedTempDirectory
 public:
     ScopedTempDirectory()
         : path_(std::filesystem::temp_directory_path() /
-                ("novainfra_logger_tests_" + std::to_string(novainfra::core::Pid()) + "_" +
+                ("novainfra_logger_tests_" + std::to_string(novainfra::core::pid()) + "_" +
                  std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
     {
         std::filesystem::create_directories(path_);
@@ -39,13 +39,13 @@ private:
     std::filesystem::path path_;
 };
 
-std::string ReadFile(const std::filesystem::path &path)
+std::string readFile(const std::filesystem::path &path)
 {
     std::ifstream input(path, std::ios::binary);
     return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
 }
 
-void WriteMessage(const std::filesystem::path &path, bool truncate, std::string_view message)
+void writeMessage(const std::filesystem::path &path, bool truncate, std::string_view message)
 {
     auto sink = std::make_shared<novainfra::log::sinks::BasicFileSink<std::mutex>>(path.string(), truncate);
     sink->setPattern("%v");
@@ -66,7 +66,7 @@ TEST(BasicFileSink, WritesFormattedMessageAndCreatesParentDirectories)
     logger.flush();
 
     EXPECT_EQ(sink->filename(), path.string());
-    EXPECT_EQ(ReadFile(path), "value 42\n");
+    EXPECT_EQ(readFile(path), "value 42\n");
 }
 
 TEST(BasicFileSink, SupportsAppendConstructorAndExplicitTruncate)
@@ -74,9 +74,9 @@ TEST(BasicFileSink, SupportsAppendConstructorAndExplicitTruncate)
     const ScopedTempDirectory tempDirectory;
     const auto path = tempDirectory.path() / "logger.log";
 
-    WriteMessage(path, true, "first");
-    WriteMessage(path, false, "second");
-    EXPECT_EQ(ReadFile(path), "first\nsecond\n");
+    writeMessage(path, true, "first");
+    writeMessage(path, false, "second");
+    EXPECT_EQ(readFile(path), "first\nsecond\n");
 
     {
         auto sink = std::make_shared<novainfra::log::sinks::BasicFileSink<std::mutex>>(path.string());
@@ -86,15 +86,15 @@ TEST(BasicFileSink, SupportsAppendConstructorAndExplicitTruncate)
         logger.info("third");
         logger.flush();
     }
-    EXPECT_EQ(ReadFile(path), "third\n");
+    EXPECT_EQ(readFile(path), "third\n");
 
-    WriteMessage(path, true, "replacement");
-    EXPECT_EQ(ReadFile(path), "replacement\n");
+    writeMessage(path, true, "replacement");
+    EXPECT_EQ(readFile(path), "replacement\n");
 }
 
 TEST(FileAssistant, RejectsOperationsWhileClosed)
 {
-    novainfra::log::details::FileAssistant file;
+    novainfra::log::detail::FileAssistant file;
 
     EXPECT_THROW(file.write("message"), std::runtime_error);
     EXPECT_THROW(file.flush(), std::runtime_error);
@@ -114,7 +114,7 @@ TEST(FileAssistant, CloseStillReleasesFileWhenCallbacksThrow)
     };
     handlers.afterClose = [&](const novainfra::Filename &) { afterCloseCalled = true; };
 
-    novainfra::log::details::FileAssistant file(handlers);
+    novainfra::log::detail::FileAssistant file(handlers);
     file.open(path.string(), true);
     EXPECT_THROW(file.close(), std::runtime_error);
     EXPECT_TRUE(afterCloseCalled);
@@ -133,7 +133,7 @@ TEST(FileAssistant, DestructorContainsCloseCallbackFailures)
 
     testing::internal::CaptureStderr();
     {
-        novainfra::log::details::FileAssistant file(handlers);
+        novainfra::log::detail::FileAssistant file(handlers);
         file.open(path.string(), true);
     }
     const auto error = testing::internal::GetCapturedStderr();

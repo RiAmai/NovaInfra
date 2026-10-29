@@ -8,15 +8,15 @@ constexpr int kMajor = 0;
 constexpr int kMinor = 1;
 constexpr int kPatch = 0;
 
-inline int MajorVersion()
+inline int majorVersion()
 {
     return kMajor;
 }
-inline int MinorVersion()
+inline int minorVersion()
 {
     return kMinor;
 }
-inline int PatchVersion()
+inline int patchVersion()
 {
     return kPatch;
 }

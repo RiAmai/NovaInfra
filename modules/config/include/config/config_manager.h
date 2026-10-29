@@ -4,6 +4,8 @@
 #include "snapshot.h"
 #include "types.h"
 
+#include <core/macros.h>
+
 #include <atomic>
 #include <chrono>
 #include <exception>
@@ -23,8 +25,8 @@ public:
     using ChangeCallback = std::function<void(const Snapshot &, const Error *)>;
 
     ConfigManager();
-    ConfigManager(ConfigManager &&) noexcept = default;
-    ConfigManager &operator=(ConfigManager &&other) noexcept;
+    ConfigManager(ConfigManager &&) NOVAINFRA_NOEXCEPT = default;
+    ConfigManager &operator=(ConfigManager &&other) NOVAINFRA_NOEXCEPT;
     ~ConfigManager();
     ConfigManager(const ConfigManager &) = delete;
     ConfigManager &operator=(const ConfigManager &) = delete;
@@ -37,8 +39,8 @@ public:
     Snapshot snapshot() const;
     Result<void> startWatching(WatchOptions options = {}, ChangeCallback callback = {});
     void stopWatching();
-    bool watching() const noexcept;
-    std::exception_ptr watchFailure() const noexcept;
+    bool watching() const NOVAINFRA_NOEXCEPT;
+    std::exception_ptr watchFailure() const NOVAINFRA_NOEXCEPT;
 
 private:
     struct Impl;

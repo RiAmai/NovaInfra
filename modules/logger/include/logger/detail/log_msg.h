@@ -7,7 +7,7 @@
 
 
 NOVAINFRA_NAMESPACE_BEGIN
-namespace log::details {
+namespace log::detail {
 
 struct NOVAINFRA_LIB_PORT LogMsg {
     LogMsg() = default;
@@ -16,7 +16,7 @@ struct NOVAINFRA_LIB_PORT LogMsg {
         : timestamp(logTime), level(levelIn)
 #ifndef NOVAINFRA_NO_THREAD_ID
           ,
-          threadId(core::ThreadId())
+          threadId(core::threadId())
 #endif
           ,
           source(loc), loggerName(loggerNameIn), message(msg)
@@ -29,11 +29,11 @@ struct NOVAINFRA_LIB_PORT LogMsg {
     {
     }
     LogMsg(SourceLocation loc, std::string_view loggerNameIn, Level levelIn, std::string_view msg)
-        : LogMsg(core::Now(), loc, loggerNameIn, levelIn, msg)
+        : LogMsg(core::now(), loc, loggerNameIn, levelIn, msg)
     {
     }
     LogMsg(std::string_view loggerNameIn, Level levelIn, std::string_view msg)
-        : LogMsg(core::Now(), SourceLocation{}, loggerNameIn, levelIn, msg)
+        : LogMsg(core::now(), SourceLocation{}, loggerNameIn, levelIn, msg)
     {
     }
     LogMsg(const LogMsg &other) = default;
@@ -47,9 +47,9 @@ struct NOVAINFRA_LIB_PORT LogMsg {
     std::string_view message;
 };
 
-}  // namespace log::details
+}  // namespace log::detail
 
 namespace log {
-using LogMsg = details::LogMsg;
+using LogMsg = detail::LogMsg;
 }
 NOVAINFRA_NAMESPACE_END

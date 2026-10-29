@@ -1,7 +1,7 @@
 #pragma once
 
 #include <logger/async/types.h>
-#include <logger/details/async_log_msg.h>
+#include <logger/detail/async_log_msg.h>
 #include <logger/registry.h>
 
 #include <core/export.h>
@@ -45,7 +45,7 @@ public:
 private:
     friend class AsyncLogger;
 
-    using QueueType = MpmcBlockingQueue<details::AsyncLogMsg>;
+    using QueueType = MpmcBlockingQueue<detail::AsyncLogMsg>;
 
     struct WorkerContext {
         AsyncLogThreadPool *pool = nullptr;
@@ -53,10 +53,10 @@ private:
         std::vector<std::shared_ptr<AsyncLogger>> pendingFlushLoggers;
     };
 
-    void postLog(std::shared_ptr<AsyncLogger> &&logger, const details::LogMsg &msg,
+    void postLog(std::shared_ptr<AsyncLogger> &&logger, const detail::LogMsg &msg,
                  AsyncOverflowPolicy policy);
     void postFlush(std::shared_ptr<AsyncLogger> &&logger);
-    void postAsyncMsg(details::AsyncLogMsg &&newMsg, AsyncOverflowPolicy policy);
+    void postAsyncMsg(detail::AsyncLogMsg &&newMsg, AsyncOverflowPolicy policy);
     void workerLoop() NOVAINFRA_NOEXCEPT;
     bool processNextMsg(WorkerContext &context);
     void flushPendingLoggers(WorkerContext &context) NOVAINFRA_NOEXCEPT;

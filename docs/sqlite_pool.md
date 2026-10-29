@@ -31,8 +31,8 @@ flowchart LR
 - `ConnectionPool` 创建数据库句柄、应用 PRAGMA/post-open 配置，并协调一个 writer 和多个 reader 槽位。
 - `WriteConn` 获得唯一写连接，负责写 SQL、事务和提交/回滚；`ReadConn` 从空闲槽位取得只读连接。
 - `Statement` 封装预编译语句、绑定参数和逐行读取；它通过共享 lease 延长底层连接的生命周期。
-- SQLite 后端可以是系统 SQLite、bundled SQLite 或 SQLCipher；加密配置通过 `PoolConfig::postOpen` 注入。
-- `PoolConfig::healthCheckIntervalMs` 大于零时启动后台健康检查线程，空闲连接探测失败会被替换。
+- SQLite 后端可以是系统 SQLite、bundled SQLite 或 SQLCipher；加密配置通过 `PoolOptions::onPostOpen` 注入。
+- `PoolOptions::healthCheckIntervalMs` 大于零时启动后台健康检查线程，空闲连接探测失败会被替换。
 
 ### 并发、生命周期与失败处理
 
@@ -65,7 +65,7 @@ find_package(NovaInfra CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE NovaInfra::SqlitePool)
 ```
 
-默认使用普通 SQLite。系统提供 SQLCipher 时，可在配置阶段设置 `-DSQLITE_BACKEND=sqlcipher`，然后通过 `PoolConfig::postOpen` 在每个连接打开后执行密钥配置。
+默认使用普通 SQLite。系统提供 SQLCipher 时，可在配置阶段设置 `-DSQLITE_BACKEND=sqlcipher`，然后通过 `PoolOptions::onPostOpen` 在每个连接打开后执行密钥配置。
 
 ## 快速开始
 
@@ -77,7 +77,7 @@ target_link_libraries(my_app PRIVATE NovaInfra::SqlitePool)
 
 int main()
 {
-    novainfra::sqlitepool::PoolConfig config;
+    novainfra::sqlitepool::PoolOptions config;
     config.readConnections = 2;
     config.pageCacheSize = -2048; // 每个连接最多约 2 MiB page cache，按需分配。
     config.pragmas.emplace_back("foreign_keys=ON");
@@ -161,7 +161,7 @@ statement.bind(":title", std::string("important"))
 ## 配置
 
 ```cpp
-novainfra::sqlitepool::PoolConfig config;
+novainfra::sqlitepool::PoolOptions config;
 config.readConnections = 4;
 config.pageCacheSize = -16000;       // 负值表示 KiB
 config.busyTimeoutMs = 5000;
@@ -178,7 +178,7 @@ config.pragmas.emplace_back("foreign_keys=ON");
 | `healthCheckIntervalMs` | `30000` | 后台健康检查间隔；`0` 表示禁用 |
 | `journalMode` | `WAL` | writer 使用的日志模式，通常保持 WAL |
 | `pragmas` | 空 | 应用于每个新连接的额外 PRAGMA 内容 |
-| `postOpen` | 空 | 每个连接打开后调用，参数表示 SQLite handle 和是否为 writer |
+| `onPostOpen` | 空 | 每个连接打开后调用，参数表示 SQLite handle 和是否为 writer |
 
 WAL 通常能让读写并行进行。只有在明确了解 SQLite 日志模式影响时，才修改 `journalMode`。
 
@@ -229,7 +229,7 @@ try {
 
 生产环境显式设置 reader 数和每连接 cache。默认 reader 为 `max(hardware_concurrency, 4)`，加上一个 writer；默认 `pageCacheSize=-8000` 的单位是 KiB。64 核机器共 65 个连接，配置的 page cache 预算约 508 MiB，实际按需分配，另有语句、结果集和 mmap 等内存。
 
-健康检查逐个预留空闲读槽位，再在锁外执行 probe、重开连接和 `postOpen`，其他槽位仍可借用或归还。`postOpen` 不应重入 `checkHealth()` 或等待同一预留槽位。
+健康检查逐个预留空闲读槽位，再在锁外执行 probe、重开连接和 `onPostOpen`，其他槽位仍可借用或归还。`onPostOpen` 不应重入 `checkHealth()` 或等待同一预留槽位。
 
 `query()` 的 `RowSet` 会把全部行列物化为字符串；浮点值按 `max_digits10` 输出以保留 double 往返精度，文本形式可能包含指数且不再固定六位小数。大结果优先使用 `prepare()`、`step()` 和 `columnInt64/Double/TextView()` 流式读取；NULL 和空字符串需要用 typed API 的 `columnNull()` 区分。
 

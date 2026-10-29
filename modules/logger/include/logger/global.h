@@ -1,7 +1,7 @@
 #pragma once
 
 #include <logger/async/async_log_thread_pool.h>
-#include <logger/details/format_traits.h>
+#include <logger/detail/format_traits.h>
 #include <logger/formatters/pattern_formatter.h>
 #include <logger/types.h>
 #include <logger/logger.h>
@@ -38,9 +38,9 @@ NOVAINFRA_INLINE void initLogger(std::shared_ptr<Logger> newLogger)
     Registry::instance().initLogger(std::move(newLogger));
 }
 
-NOVAINFRA_INLINE std::shared_ptr<Logger> getNameLogger(std::string name)
+NOVAINFRA_INLINE std::shared_ptr<Logger> findLogger(std::string name)
 {
-    return Registry::instance().getNameLogger(name);
+    return Registry::instance().findLogger(name);
 }
 
 NOVAINFRA_INLINE void setLevel(Level level)
@@ -53,7 +53,7 @@ NOVAINFRA_INLINE void setLevels(Registry::LogLevels levels, const Level *globalL
     Registry::instance().setLevels(std::move(levels), globalLevel);
 }
 
-NOVAINFRA_INLINE Level getLevel()
+NOVAINFRA_INLINE Level level()
 {
     return defaultLogger()->level();
 }
@@ -171,7 +171,7 @@ NOVAINFRA_INLINE void log(Level level, const T &msg)
 
 // T cannot be statically converted to format string (including string_view/wstring_view)
 template <class T,
-          typename std::enable_if<!details::IsConvertibleToAnyFormatString<const T &>::value, int>::type = 0>
+          typename std::enable_if<!detail::IsConvertibleToAnyFormatString<const T &>::value, int>::type = 0>
 NOVAINFRA_INLINE void log(SourceLocation source, Level level, const T &msg)
 {
     defaultLogger()->log(source, level, msg);

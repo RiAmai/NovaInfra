@@ -58,7 +58,7 @@ int main()
     const auto path =
         std::filesystem::temp_directory_path() / ("novainfra-installed-" + std::to_string(getpid()) + ".db");
     {
-        novainfra::sqlitepool::PoolConfig config;
+        novainfra::sqlitepool::PoolOptions config;
         config.readConnections = 1;
         novainfra::sqlitepool::ConnectionPool db(path.string(), config);
         if (db.read().query("SELECT 7 AS value")[0].at("value") != "7")

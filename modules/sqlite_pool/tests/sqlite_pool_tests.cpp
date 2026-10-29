@@ -38,9 +38,9 @@ private:
     std::string pathString_{path_.string()};
 };
 
-novainfra::sqlitepool::PoolConfig OneReader()
+novainfra::sqlitepool::PoolOptions oneReader()
 {
-    novainfra::sqlitepool::PoolConfig config;
+    novainfra::sqlitepool::PoolOptions config;
     config.readConnections = 1;
     return config;
 }
@@ -56,7 +56,7 @@ TEST(SqlitePool, DefaultAndExplicitReaderPoolSizes)
     novainfra::sqlitepool::ConnectionPool defaults(database.string());
     EXPECT_GE(defaults.readPoolSize(), 4U);
 
-    auto config = OneReader();
+    auto config = oneReader();
     novainfra::sqlitepool::ConnectionPool explicitPool(database.string(), config);
     EXPECT_EQ(explicitPool.readPoolSize(), 1U);
 }
@@ -64,7 +64,7 @@ TEST(SqlitePool, DefaultAndExplicitReaderPoolSizes)
 TEST(SqlitePool, TransactionCommitsAndRollsBack)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), OneReader());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), oneReader());
     pool.write().exec("CREATE TABLE values_table(value INTEGER NOT NULL)");
 
     pool.write().transaction([](novainfra::sqlitepool::WriteConn &db) {
@@ -84,7 +84,7 @@ TEST(SqlitePool, TransactionCommitsAndRollsBack)
 TEST(SqlitePool, BindingAndColumnAccessWork)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), OneReader());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), oneReader());
     auto db = pool.write();
     db.exec("CREATE TABLE items(id INTEGER, name TEXT, score REAL, note TEXT)");
     auto insert = db.prepare("INSERT INTO items VALUES(:id, :name, :score, :note)");
@@ -108,7 +108,7 @@ TEST(SqlitePool, BindingAndColumnAccessWork)
 TEST(SqlitePool, TextAccessPreservesEmbeddedNulls)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), OneReader());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), oneReader());
     pool.write().exec("CREATE TABLE text_values(value TEXT)");
     pool.write().exec("INSERT INTO text_values(value) VALUES(CAST(X'610062' AS TEXT)), (NULL)");
 
@@ -128,7 +128,7 @@ TEST(SqlitePool, TextAccessPreservesEmbeddedNulls)
 TEST(SqlitePool, MaterializedRowsPreserveNamesValuesAndEmbeddedNulls)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), OneReader());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), oneReader());
     const auto rows = pool.read().query("SELECT 9223372036854775807 AS integer_value, 2.5 AS real_value, "
                                         "CAST(X'780079' AS TEXT) AS text_value, NULL AS null_value");
 
@@ -142,7 +142,7 @@ TEST(SqlitePool, MaterializedRowsPreserveNamesValuesAndEmbeddedNulls)
 TEST(SqlitePool, MaterializedRowsKeepLastDuplicateColumnName)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), OneReader());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), oneReader());
     const auto rows = pool.read().query("SELECT 1 AS duplicate, 2 AS duplicate");
 
     ASSERT_EQ(rows.size(), 1U);
@@ -155,7 +155,7 @@ TEST(SqlitePool, ReadSlotIsReleasedAndStatementKeepsLease)
     TempDatabase database;
     novainfra::sqlitepool::Statement statement;
     {
-        novainfra::sqlitepool::ConnectionPool pool(database.string(), OneReader());
+        novainfra::sqlitepool::ConnectionPool pool(database.string(), oneReader());
         pool.write().exec("CREATE TABLE items(value INTEGER)");
         auto reader = pool.read();
         statement = reader.prepare("SELECT 1 AS value");
@@ -168,7 +168,7 @@ TEST(SqlitePool, ReadSlotIsReleasedAndStatementKeepsLease)
 TEST(SqlitePool, SecondReaderWaitsForFirstReader)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), OneReader());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), oneReader());
     std::future<std::size_t> waiting;
     {
         auto first = pool.read();
@@ -184,7 +184,7 @@ TEST(SqlitePool, SecondReaderWaitsForFirstReader)
 TEST(SqlitePool, InvalidSqlReportsSqliteError)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), OneReader());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), oneReader());
     EXPECT_THROW(pool.read().query("SELECT definitely_missing"), novainfra::sqlitepool::SqliteError);
     EXPECT_THROW(pool.write().prepare("SELECT :missing").bind(":unknown", 1),
                  novainfra::sqlitepool::SqliteError);
@@ -194,8 +194,8 @@ TEST(SqlitePool, IntegrityAndPostOpenAreAvailable)
 {
     TempDatabase database;
     std::atomic<int> opened{0};
-    auto config = OneReader();
-    config.postOpen = [&opened](sqlite3 *, bool) { ++opened; };
+    auto config = oneReader();
+    config.onPostOpen = [&opened](sqlite3 *, bool) { ++opened; };
     novainfra::sqlitepool::ConnectionPool pool(database.string(), config);
     EXPECT_EQ(opened.load(), 2);
     EXPECT_NO_THROW(pool.integrityCheck());
@@ -206,7 +206,7 @@ TEST(SqlitePool, IntegrityAndPostOpenAreAvailable)
 TEST(SqlitePool, HealthCheckReplacesUnhealthyReadAndWriteConnections)
 {
     TempDatabase database;
-    auto config = OneReader();
+    auto config = oneReader();
     config.healthCheckIntervalMs = 0;
     novainfra::sqlitepool::ConnectionPool pool(database.string(), config);
 
@@ -235,7 +235,7 @@ TEST(SqlitePool, HealthCheckReplacesUnhealthyReadAndWriteConnections)
 TEST(SqlitePool, HealthCheckSkipsBusyReaders)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), OneReader());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), oneReader());
     auto reader = pool.read();
 
     const auto result = pool.checkHealth();
@@ -248,9 +248,9 @@ TEST(SqlitePool, HealthCheckRetriesFailedReplacement)
 {
     TempDatabase database;
     std::atomic<bool> failOpen{false};
-    auto config = OneReader();
+    auto config = oneReader();
     config.healthCheckIntervalMs = 0;
-    config.postOpen = [&failOpen](sqlite3 *, bool) {
+    config.onPostOpen = [&failOpen](sqlite3 *, bool) {
         if (failOpen.load()) {
             throw std::runtime_error("injected replacement failure");
         }
@@ -275,7 +275,7 @@ TEST(SqlitePool, HealthCheckRetriesFailedReplacement)
 TEST(SqlitePool, BackgroundHealthCheckRunsAtConfiguredInterval)
 {
     TempDatabase database;
-    auto config = OneReader();
+    auto config = oneReader();
     config.healthCheckIntervalMs = 10;
     novainfra::sqlitepool::ConnectionPool pool(database.string(), config);
     {
@@ -297,7 +297,7 @@ TEST(SqlitePool, BackgroundHealthCheckRunsAtConfiguredInterval)
 TEST(SqlitePool, ConcurrentReads)
 {
     TempDatabase database;
-    auto config = OneReader();
+    auto config = oneReader();
     config.readConnections = 4;
     novainfra::sqlitepool::ConnectionPool pool(database.string(), config);
     pool.write().exec("CREATE TABLE data(id INTEGER PRIMARY KEY, value TEXT)");
@@ -338,7 +338,7 @@ TEST(SqlitePool, ConcurrentReads)
 TEST(SqlitePool, ConcurrentWritesAndReads)
 {
     TempDatabase database;
-    auto config = OneReader();
+    auto config = oneReader();
     config.readConnections = 4;
     novainfra::sqlitepool::ConnectionPool pool(database.string(), config);
     pool.write().exec("CREATE TABLE counters(id INTEGER PRIMARY KEY, value INTEGER DEFAULT 0)");
@@ -447,7 +447,7 @@ TEST(SqlitePool, ConcurrentTransactions)
 TEST(SqlitePool, StressTestReadPoolExhaustion)
 {
     TempDatabase database;
-    auto config = OneReader();
+    auto config = oneReader();
     config.readConnections = 2;
     novainfra::sqlitepool::ConnectionPool pool(database.string(), config);
     pool.write().exec("CREATE TABLE items(id INTEGER)");
@@ -480,7 +480,7 @@ TEST(SqlitePool, StressTestReadPoolExhaustion)
 TEST(SqlitePool, MaterializedDoublePreservesRoundTripPrecision)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), OneReader());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), oneReader());
     for (double value : {1.2345678901234567, 1e-200, 1e200, -1.2345678901234567}) {
         auto statement = pool.read().prepare("SELECT ? AS value");
         auto rows = statement.bind(1, value).query();
@@ -492,12 +492,12 @@ TEST(SqlitePool, MaterializedDoublePreservesRoundTripPrecision)
 TEST(SqlitePool, SlowReadReplacementDoesNotBlockOtherReaderSlots)
 {
     TempDatabase database;
-    auto config = OneReader();
+    auto config = oneReader();
     config.readConnections = 2;
     std::atomic<bool> replacing{false};
     std::promise<void> entered, release;
     auto gate = release.get_future().share();
-    config.postOpen = [&](sqlite3 *, bool writer) {
+    config.onPostOpen = [&](sqlite3 *, bool writer) {
         if (!writer && replacing.load()) {
             entered.set_value();
             gate.wait();

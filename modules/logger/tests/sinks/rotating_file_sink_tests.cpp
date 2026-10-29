@@ -23,7 +23,7 @@ class ScopedTempDirectory
 public:
     ScopedTempDirectory()
         : path_(std::filesystem::temp_directory_path() /
-                ("novainfra_rotating_tests_" + std::to_string(novainfra::core::Pid()) + "_" +
+                ("novainfra_rotating_tests_" + std::to_string(novainfra::core::pid()) + "_" +
                  std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
     {
         std::filesystem::create_directories(path_);
@@ -41,7 +41,7 @@ private:
     std::filesystem::path path_;
 };
 
-std::string ReadFile(const std::filesystem::path &path)
+std::string readFile(const std::filesystem::path &path)
 {
     std::ifstream input(path, std::ios::binary);
     return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
@@ -76,8 +76,8 @@ TEST(RotatingFileSink, RuntimeLimitsAreValidatedAndSynchronized)
 
     EXPECT_THROW(sink->setMaxSize(0), std::invalid_argument);
     EXPECT_THROW(sink->setMaxFileNum(RotatingSink::kMaxFileNum + 1), std::invalid_argument);
-    EXPECT_EQ(sink->getMaxSize(), 1024U * 1024U);
-    EXPECT_EQ(sink->getMaxFileNum(), 2U);
+    EXPECT_EQ(sink->maxSize(), 1024U * 1024U);
+    EXPECT_EQ(sink->maxFileNum(), 2U);
 
     std::thread writer([&] {
         for (int index = 0; index < 1000; ++index) {
@@ -111,10 +111,10 @@ TEST(RotatingFileSink, RotatesBeforeOverflowAndKeepsConfiguredHistory)
     }
     logger.flush();
 
-    EXPECT_EQ(ReadFile(path), "0008\n0009\n");
-    EXPECT_EQ(ReadFile(RotatingSink::calcFilename(path.string(), 1)), "0006\n0007\n");
-    EXPECT_EQ(ReadFile(RotatingSink::calcFilename(path.string(), 2)), "0004\n0005\n");
-    EXPECT_EQ(ReadFile(RotatingSink::calcFilename(path.string(), 3)), "0002\n0003\n");
+    EXPECT_EQ(readFile(path), "0008\n0009\n");
+    EXPECT_EQ(readFile(RotatingSink::calcFilename(path.string(), 1)), "0006\n0007\n");
+    EXPECT_EQ(readFile(RotatingSink::calcFilename(path.string(), 2)), "0004\n0005\n");
+    EXPECT_EQ(readFile(RotatingSink::calcFilename(path.string(), 3)), "0002\n0003\n");
     EXPECT_FALSE(std::filesystem::exists(RotatingSink::calcFilename(path.string(), 4)));
 }
 
@@ -132,8 +132,8 @@ TEST(RotatingFileSink, RotateNowResetsCurrentSize)
     logger.info("cccc");
     logger.flush();
 
-    EXPECT_EQ(ReadFile(path), "bbbb\ncccc\n");
-    EXPECT_EQ(ReadFile(RotatingSink::calcFilename(path.string(), 1)), "aaaa\n");
+    EXPECT_EQ(readFile(path), "bbbb\ncccc\n");
+    EXPECT_EQ(readFile(RotatingSink::calcFilename(path.string(), 1)), "aaaa\n");
     EXPECT_FALSE(std::filesystem::exists(RotatingSink::calcFilename(path.string(), 2)));
 }
 
@@ -154,8 +154,8 @@ TEST(RotatingFileSink, RotateOnOpenArchivesExistingFile)
         logger.flush();
     }
 
-    EXPECT_EQ(ReadFile(path), "fresh\n");
-    EXPECT_EQ(ReadFile(RotatingSink::calcFilename(path.string(), 1)), "existing\n");
+    EXPECT_EQ(readFile(path), "fresh\n");
+    EXPECT_EQ(readFile(RotatingSink::calcFilename(path.string(), 1)), "existing\n");
 }
 
 }  // namespace

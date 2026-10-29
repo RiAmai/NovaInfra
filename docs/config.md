@@ -562,4 +562,4 @@ Config 的加载、校验、读取和重载错误通过 `Result` 返回，不依
 
 `NOVAINFRA_CONFIG_BUILD_TOOLS=ON` 构建模板生成器和校验器；它们内置 webserver、database-service 示例 Schema，应用需替换为自身 Schema。全注释模板用于填写，必填项未启用时不能通过校验。
 
-`NOVAINFRA_CONFIG_BUILD_BENCHMARKS=ON` 构建 `benchmark_config`，兼容旧开关 `BUILD_BENCHMARKS`。基准覆盖完整配置加载、快照取得、缓存快照查询、重载及多线程读取；任何场景失败返回非零。逐次测量输出 P50/P95/P99，计时开销包含在结果内。
+`NOVAINFRA_CONFIG_BUILD_BENCHMARKS=ON` 构建 `novainfra_config_benchmarks`，兼容旧开关 `BUILD_BENCHMARKS`。基准覆盖完整配置加载、快照取得、缓存快照查询、重载及多线程读取；任何场景失败返回非零。逐次测量输出 P50/P95/P99，计时开销包含在结果内。

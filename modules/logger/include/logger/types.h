@@ -23,7 +23,7 @@ namespace log {
 
 using ErrHandler = std::function<void(const std::string &errMsg)>;
 
-enum Level : int {
+enum class Level : int {
     TRACE = NOVAINFRA_LOG_LEVEL_TRACE,
     DEBUG = NOVAINFRA_LOG_LEVEL_DEBUG,
     INFO = NOVAINFRA_LOG_LEVEL_INFO,

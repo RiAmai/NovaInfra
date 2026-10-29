@@ -9,7 +9,8 @@
 NOVAINFRA_NAMESPACE_BEGIN
 namespace sqlitepool {
 
-static std::string colToString(sqlite3_stmt *s, int c)
+namespace {
+std::string colToString(sqlite3_stmt *s, int c)
 {
     switch (sqlite3_column_type(s, c)) {
         case SQLITE_INTEGER: {
@@ -35,7 +36,7 @@ static std::string colToString(sqlite3_stmt *s, int c)
     }
 }
 
-static int namedIdx(sqlite3_stmt *s, const std::string &name)
+int namedIdx(sqlite3_stmt *s, const std::string &name)
 {
     int idx = sqlite3_bind_parameter_index(s, name.c_str());
     if (idx == 0) {
@@ -43,21 +44,23 @@ static int namedIdx(sqlite3_stmt *s, const std::string &name)
     }
     return idx;
 }
+}  // namespace
 
-Statement::Statement(Statement &&o) NOVAINFRA_NOEXCEPT : stmt_(o.stmt_), lease_(std::move(o.lease_))
+Statement::Statement(Statement &&other) NOVAINFRA_NOEXCEPT
+    : stmt_(other.stmt_), lease_(std::move(other.lease_))
 {
-    o.stmt_ = nullptr;
+    other.stmt_ = nullptr;
 }
 
-Statement &Statement::operator=(Statement &&o) NOVAINFRA_NOEXCEPT
+Statement &Statement::operator=(Statement &&other) NOVAINFRA_NOEXCEPT
 {
-    if (this != &o) {
+    if (this != &other) {
         if (stmt_) {
             sqlite3_finalize(stmt_);
         }
-        stmt_ = o.stmt_;
-        lease_ = std::move(o.lease_);
-        o.stmt_ = nullptr;
+        stmt_ = other.stmt_;
+        lease_ = std::move(other.lease_);
+        other.stmt_ = nullptr;
     }
     return *this;
 }

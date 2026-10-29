@@ -26,7 +26,7 @@ struct ObservedMessage {
     bool staticSource{false};
 };
 
-ObservedMessage CopyMessage(const novainfra::log::LogMsg &msg)
+ObservedMessage copyMessage(const novainfra::log::LogMsg &msg)
 {
     return {msg.timestamp,
             msg.level,
@@ -42,9 +42,9 @@ TEST(CallbackSink, ReceivesRawMessageFieldsAndEmbeddedNulls)
 {
     ObservedMessage observed;
     auto sink = std::make_shared<novainfra::log::sinks::CallbackSinkSt>(
-        [&observed](const novainfra::log::LogMsg &msg) { observed = CopyMessage(msg); });
+        [&observed](const novainfra::log::LogMsg &msg) { observed = copyMessage(msg); });
     novainfra::log::Logger logger("callback", sink);
-    const auto timestamp = novainfra::core::Now();
+    const auto timestamp = novainfra::core::now();
     constexpr auto source = novainfra::log::SourceLocation::fromStatic("callback.cpp", 27, "callbackTest");
     const std::string message("raw\0message", 11);
 

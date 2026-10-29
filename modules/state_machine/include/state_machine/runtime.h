@@ -35,17 +35,17 @@ private:
     /** @brief 队列中保存的、已经拥有事件数据的任务。 */
     struct TaskBase {
         virtual ~TaskBase() = default;
-        virtual void run(Shared &state) noexcept = 0;
+        virtual void run(Shared &state) NOVAINFRA_NOEXCEPT = 0;
     };
     using Task = std::unique_ptr<TaskBase>;
 
     template <typename Event>
-    struct EventTaskImpl final : TaskBase {
+    struct EventTaskImpl NOVAINFRA_FINAL : TaskBase {
         template <typename T>
         explicit EventTaskImpl(T &&value) : event(std::forward<T>(value))
         {
         }
-        void run(Shared &state) noexcept override { state.process(event); }
+        void run(Shared &state) NOVAINFRA_NOEXCEPT NOVAINFRA_OVERRIDE { state.process(event); }
         Event event;
     };
 
@@ -88,7 +88,7 @@ private:
 
         /** @brief 调用错误回调，并隔离错误回调自身抛出的异常。 */
         static void reportError(const RuntimeOptions &options, std::type_index type,
-                                std::exception_ptr exception) noexcept
+                                std::exception_ptr exception) NOVAINFRA_NOEXCEPT
         {
             if (!options.onError) {
                 return;
@@ -101,7 +101,7 @@ private:
         }
 
         /** @brief 调用事件处理观察回调，并隔离观察回调异常。 */
-        static void reportProcessed(const RuntimeOptions &options, const ProcessReport &report) noexcept
+        static void reportProcessed(const RuntimeOptions &options, const ProcessReport &report) NOVAINFRA_NOEXCEPT
         {
             if (!options.onProcessed) {
                 return;
@@ -114,7 +114,7 @@ private:
         }
 
         /** @brief 调用未处理事件回调，并隔离观察回调异常。 */
-        static void reportUnhandled(const RuntimeOptions &options, std::type_index type) noexcept
+        static void reportUnhandled(const RuntimeOptions &options, std::type_index type) NOVAINFRA_NOEXCEPT
         {
             if (!options.onUnhandledEvent) {
                 return;
@@ -131,7 +131,7 @@ private:
          *
          * 状态机回调失败后不能继续假设状态图处于可恢复状态，因此停止接收事件。
          */
-        void fail(std::type_index eventType, std::exception_ptr exception) noexcept
+        void fail(std::type_index eventType, std::exception_ptr exception) NOVAINFRA_NOEXCEPT
         {
             std::deque<Task> retired;
             {
@@ -151,7 +151,7 @@ private:
         }
 
         /** @brief 向外部 executor 提交唯一的 drain 任务。 */
-        bool schedule() noexcept
+        bool schedule() NOVAINFRA_NOEXCEPT
         {
             if (!options.executor) {
                 return true;
@@ -192,7 +192,7 @@ private:
 
         /** @brief 在 drain 线程中执行一个事件并更新处理统计。 */
         template <typename Event>
-        void process(const Event &event) noexcept
+        void process(const Event &event) NOVAINFRA_NOEXCEPT
         {
             ProcessReport report;
             report.eventType = typeid(Event);
@@ -229,7 +229,7 @@ private:
          * @brief 按 FIFO 顺序排空事件队列。
          * @param limit 本次最多处理的事件数。
          */
-        void drain(const std::optional<std::size_t> &limit) noexcept
+        void drain(const std::optional<std::size_t> &limit) NOVAINFRA_NOEXCEPT
         {
             std::size_t drained = 0;
             {
@@ -361,7 +361,7 @@ private:
         }
 
         /** @brief 停止接收事件，并按指定策略排空或丢弃队列。 */
-        void shutdown(ShutdownMode mode) noexcept
+        void shutdown(ShutdownMode mode) NOVAINFRA_NOEXCEPT
         {
             std::deque<Task> retired;
             std::lock_guard<std::mutex> lock(mutex);
@@ -382,7 +382,7 @@ private:
             idle.notify_all();
         }
 
-        void dispose() noexcept
+        void dispose() NOVAINFRA_NOEXCEPT
         {
             shutdown(ShutdownMode::DISCARD);
             {
@@ -434,7 +434,7 @@ public:
     }
 
     /** @brief 丢弃待处理事件并等待正在执行的事件；禁止在自身回调中析构。 */
-    ~StateMachineRuntime() noexcept { state_->dispose(); }
+    ~StateMachineRuntime() NOVAINFRA_NOEXCEPT { state_->dispose(); }
 
     NOVAINFRA_DISABLE_COPY_MOVE(StateMachineRuntime)
 
@@ -454,7 +454,7 @@ public:
     /** @brief 无 executor 时在当前线程最多处理 maxEvents 个事件。 */
     std::size_t poll(std::size_t maxEvents) { return state_->poll(maxEvents); }
     /** @brief 停止接收事件；DRAIN 会处理已接受事件，DISCARD 会丢弃队列。 */
-    void shutdown(ShutdownMode mode = ShutdownMode::DRAIN) noexcept { state_->shutdown(mode); }
+    void shutdown(ShutdownMode mode = ShutdownMode::DRAIN) NOVAINFRA_NOEXCEPT { state_->shutdown(mode); }
     /** @brief 等待当前队列排空；不能从 Runtime 的 drain 回调中调用。 */
     void waitIdle() { state_->waitIdle(); }
     /** @brief 返回当前运行状态和累计计数的快照。 */

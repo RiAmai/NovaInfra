@@ -35,7 +35,7 @@ AsyncLogThreadPool::AsyncLogThreadPool(std::size_t queueMaxItems, std::size_t th
     }
     NOVAINFRA_CATCH_ALL_BODY({
         for (std::size_t index = workerPool_.size(); index > 0; --index) {
-            queue_.enqueue(details::AsyncLogMsg(details::AsyncMsgType::TERMINATE));
+            queue_.enqueue(detail::AsyncLogMsg(detail::AsyncMsgType::TERMINATE));
         }
         for (auto &worker : workerPool_) {
             if (worker.joinable()) {
@@ -66,7 +66,7 @@ AsyncLogThreadPool::~AsyncLogThreadPool() NOVAINFRA_NOEXCEPT
     }
 
     for (std::size_t index = 0; index < workerPool_.size(); ++index) {
-        queue_.enqueue(details::AsyncLogMsg(details::AsyncMsgType::TERMINATE));
+        queue_.enqueue(detail::AsyncLogMsg(detail::AsyncMsgType::TERMINATE));
     }
     for (auto &worker : workerPool_) {
         if (worker.joinable()) {
@@ -101,10 +101,10 @@ std::size_t AsyncLogThreadPool::queueSize()
     return queue_.size();
 }
 
-void AsyncLogThreadPool::postLog(std::shared_ptr<AsyncLogger> &&logger, const details::LogMsg &msg,
+void AsyncLogThreadPool::postLog(std::shared_ptr<AsyncLogger> &&logger, const detail::LogMsg &msg,
                                  AsyncOverflowPolicy policy)
 {
-    postAsyncMsg(details::AsyncLogMsg(std::move(logger), details::AsyncMsgType::LOG, msg), policy);
+    postAsyncMsg(detail::AsyncLogMsg(std::move(logger), detail::AsyncMsgType::LOG, msg), policy);
 }
 
 void AsyncLogThreadPool::postFlush(std::shared_ptr<AsyncLogger> &&logger)
@@ -125,19 +125,19 @@ void AsyncLogThreadPool::postFlush(std::shared_ptr<AsyncLogger> &&logger)
 
     // Flush controls always use BLOCK. They must not be dropped by an overflow
     // policy selected for ordinary log messages.
-    postAsyncMsg(details::AsyncLogMsg(std::move(logger), details::AsyncMsgType::FLUSH),
+    postAsyncMsg(detail::AsyncLogMsg(std::move(logger), detail::AsyncMsgType::FLUSH),
                  AsyncOverflowPolicy::BLOCK);
 }
 
-void AsyncLogThreadPool::postAsyncMsg(details::AsyncLogMsg &&newMsg, AsyncOverflowPolicy policy)
+void AsyncLogThreadPool::postAsyncMsg(detail::AsyncLogMsg &&newMsg, AsyncOverflowPolicy policy)
 {
     switch (policy) {
         case AsyncOverflowPolicy::BLOCK:
             queue_.enqueue(std::move(newMsg));
             return;
         case AsyncOverflowPolicy::OVER_RUN_OLDEST:
-            if (!queue_.enqueueNoWait(std::move(newMsg), [](const details::AsyncLogMsg &oldest) {
-                    return oldest.msgType == details::AsyncMsgType::LOG;
+            if (!queue_.enqueueNoWait(std::move(newMsg), [](const detail::AsyncLogMsg &oldest) {
+                    return oldest.msgType == detail::AsyncMsgType::LOG;
                 })) {
                 // A control message is at the head. Preserve it and wait for
                 // room rather than violating reliable flush/shutdown ordering.
@@ -176,11 +176,11 @@ void AsyncLogThreadPool::workerLoop() NOVAINFRA_NOEXCEPT
 
 bool AsyncLogThreadPool::processNextMsg(WorkerContext &context)
 {
-    details::AsyncLogMsg incomingAsyncMsg;
+    detail::AsyncLogMsg incomingAsyncMsg;
     queue_.dequeue(incomingAsyncMsg);
 
     switch (incomingAsyncMsg.msgType) {
-        case details::AsyncMsgType::LOG: {
+        case detail::AsyncMsgType::LOG: {
             if (!incomingAsyncMsg.loggerPtr) {
                 reportWorkerFailure("async log message has no logger");
                 return true;
@@ -193,7 +193,7 @@ bool AsyncLogThreadPool::processNextMsg(WorkerContext &context)
             return true;
         }
 
-        case details::AsyncMsgType::FLUSH: {
+        case detail::AsyncMsgType::FLUSH: {
             if (!incomingAsyncMsg.loggerPtr) {
                 reportWorkerFailure("async flush message has no logger");
                 return true;
@@ -203,7 +203,7 @@ bool AsyncLogThreadPool::processNextMsg(WorkerContext &context)
             return true;
         }
 
-        case details::AsyncMsgType::TERMINATE:
+        case detail::AsyncMsgType::TERMINATE:
             return false;
 
         default:

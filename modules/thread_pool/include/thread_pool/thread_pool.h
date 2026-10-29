@@ -116,10 +116,10 @@ private:
     };
 
     template <typename F>
-    struct TaskModel final : Task {
+    struct TaskModel NOVAINFRA_FINAL : Task {
         explicit TaskModel(F &&function) : function_(std::forward<F>(function)) {}
         // Execute the concrete callable held by this task.
-        void run() override { function_(); }
+        void run() NOVAINFRA_OVERRIDE { function_(); }
         F function_;
     };
 

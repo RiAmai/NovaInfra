@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core/export.h>
+#include <core/macros.h>
 #include <core/namespace.h>
 
 #include <atomic>
@@ -40,13 +41,13 @@ public:
     Subscription(const Subscription &) = delete;
     Subscription &operator=(const Subscription &) = delete;
     /** @brief 移动构造订阅句柄。 @param other 要转移的句柄。 */
-    Subscription(Subscription &&other) noexcept : slot_(std::move(other.slot_)) {}
+    Subscription(Subscription &&other) NOVAINFRA_NOEXCEPT : slot_(std::move(other.slot_)) {}
     /**
      * @brief 移动赋值订阅句柄。
      * @param other 要转移的句柄；赋值前当前订阅会被取消。
      * @return 当前句柄。
      */
-    Subscription &operator=(Subscription &&other) noexcept
+    Subscription &operator=(Subscription &&other) NOVAINFRA_NOEXCEPT
     {
         if (this != &other) {
             cancel();
@@ -56,7 +57,7 @@ public:
     }
 
     /** @brief 取消订阅；重复调用是安全的。 */
-    void cancel() noexcept
+    void cancel() NOVAINFRA_NOEXCEPT
     {
         if (slot_) {
             slot_->active.store(false, std::memory_order_release);
@@ -64,9 +65,9 @@ public:
         }
     }
     /** @brief 返回订阅当前是否仍有效。 */
-    bool active() const noexcept { return slot_ && slot_->active.load(std::memory_order_acquire); }
+    bool active() const NOVAINFRA_NOEXCEPT { return slot_ && slot_->active.load(std::memory_order_acquire); }
     /** @brief 返回订阅唯一 ID；无效句柄返回 0。 */
-    std::uint64_t id() const noexcept { return slot_ ? slot_->id : 0; }
+    std::uint64_t id() const NOVAINFRA_NOEXCEPT { return slot_ ? slot_->id : 0; }
 
 private:
     std::shared_ptr<detail::Slot> slot_;

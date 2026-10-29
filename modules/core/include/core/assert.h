@@ -6,7 +6,7 @@
 #include "./namespace.h"
 
 NOVAINFRA_NAMESPACE_BEGIN
-inline void AssertFailed(std::string_view expression, std::string_view file, int line,
+inline void assertFailed(std::string_view expression, std::string_view file, int line,
                          std::string_view message = "")
 {
     std::cerr << "[ASSERTION FAILED]\n"
@@ -23,14 +23,14 @@ NOVAINFRA_NAMESPACE_END  // namespace novainfra
 #  define NOVAINFRA_ASSERT(expr)                                                                             \
       do {                                                                                                   \
           if (!(expr)) {                                                                                     \
-              ::novainfra::AssertFailed(#expr, __FILE__, __LINE__);                                          \
+              ::novainfra::assertFailed(#expr, __FILE__, __LINE__);                                          \
           }                                                                                                  \
       } while (0)
 
 #  define NOVAINFRA_ASSERT_MSG(expr, msg)                                                                    \
       do {                                                                                                   \
           if (!(expr)) {                                                                                     \
-              ::novainfra::AssertFailed(#expr, __FILE__, __LINE__, msg);                                     \
+              ::novainfra::assertFailed(#expr, __FILE__, __LINE__, msg);                                     \
           }                                                                                                  \
       } while (0)
 

@@ -52,19 +52,19 @@ struct SampleSummary {
     double p95;
 };
 
-double ElapsedSeconds(Clock::time_point start)
+double elapsedSeconds(Clock::time_point start)
 {
     return std::chrono::duration<double>(Clock::now() - start).count();
 }
 
-SampleSummary Summarize(std::vector<double> samples)
+SampleSummary summarize(std::vector<double> samples)
 {
     std::sort(samples.begin(), samples.end());
     const auto p95Index = (samples.size() * 95 + 99) / 100 - 1;
     return {samples[samples.size() / 2], samples[std::min(p95Index, samples.size() - 1)]};
 }
 
-void PrintResult(const std::string &name, Uint64 operations, const SampleSummary &summary)
+void printResult(const std::string &name, Uint64 operations, const SampleSummary &summary)
 {
     const auto medianNs = summary.median * 1'000'000'000.0 / static_cast<double>(operations);
     const auto p95Ns = summary.p95 * 1'000'000'000.0 / static_cast<double>(operations);
@@ -75,7 +75,7 @@ void PrintResult(const std::string &name, Uint64 operations, const SampleSummary
 }
 
 template <typename Function>
-void RunBenchmark(const std::string &name, Uint64 operations, Function &&function)
+void runBenchmark(const std::string &name, Uint64 operations, Function &&function)
 {
     function(std::max<Uint64>(operations / 20, 1));
 
@@ -84,21 +84,21 @@ void RunBenchmark(const std::string &name, Uint64 operations, Function &&functio
     for (std::size_t sample = 0; sample < kMeasuredSamples; ++sample) {
         samples.push_back(function(operations));
     }
-    PrintResult(name, operations, Summarize(std::move(samples)));
+    printResult(name, operations, summarize(std::move(samples)));
 }
 
-novainfra::sqlitepool::PoolConfig PoolConfig(novainfra::Uint32 readers = 1)
+novainfra::sqlitepool::PoolOptions PoolOptions(novainfra::Uint32 readers = 1)
 {
-    novainfra::sqlitepool::PoolConfig config;
+    novainfra::sqlitepool::PoolOptions config;
     config.readConnections = readers;
     config.healthCheckIntervalMs = 0;
     return config;
 }
 
-double BenchmarkReadLease(Uint64 operations)
+double benchmarkReadLease(Uint64 operations)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolConfig(4));
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolOptions(4));
     const auto start = Clock::now();
     for (Uint64 index = 0; index < operations; ++index) {
         auto reader = pool.read();
@@ -106,13 +106,13 @@ double BenchmarkReadLease(Uint64 operations)
             std::abort();
         }
     }
-    return ElapsedSeconds(start);
+    return elapsedSeconds(start);
 }
 
-double BenchmarkPreparedWrites(Uint64 operations)
+double benchmarkPreparedWrites(Uint64 operations)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolConfig());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolOptions());
     auto writer = pool.write();
     writer.exec("CREATE TABLE benchmark_values(value INTEGER NOT NULL)");
     auto statement = writer.prepare("INSERT INTO benchmark_values(value) VALUES(?)");
@@ -123,35 +123,35 @@ double BenchmarkPreparedWrites(Uint64 operations)
         statement.bind(1, static_cast<novainfra::Int64>(index)).exec();
     }
     writer.commit();
-    return ElapsedSeconds(start);
+    return elapsedSeconds(start);
 }
 
-double BenchmarkManualTransaction(Uint64 operations)
+double benchmarkManualTransaction(Uint64 operations)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolConfig());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolOptions());
     auto writer = pool.write();
     const auto start = Clock::now();
     for (Uint64 index = 0; index < operations; ++index) {
         writer.begin();
         writer.commit();
     }
-    return ElapsedSeconds(start);
+    return elapsedSeconds(start);
 }
 
-double BenchmarkTransactionCallback(Uint64 operations)
+double benchmarkTransactionCallback(Uint64 operations)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolConfig());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolOptions());
     auto writer = pool.write();
     const auto start = Clock::now();
     for (Uint64 index = 0; index < operations; ++index) {
         writer.transaction([](novainfra::sqlitepool::WriteConn &) {});
     }
-    return ElapsedSeconds(start);
+    return elapsedSeconds(start);
 }
 
-void Populate(novainfra::sqlitepool::ConnectionPool &pool, Uint64 rows)
+void populate(novainfra::sqlitepool::ConnectionPool &pool, Uint64 rows)
 {
     auto writer = pool.write();
     writer.exec("CREATE TABLE benchmark_values(id INTEGER NOT NULL, value TEXT NOT NULL)");
@@ -164,11 +164,11 @@ void Populate(novainfra::sqlitepool::ConnectionPool &pool, Uint64 rows)
     writer.commit();
 }
 
-double BenchmarkTypedRead(Uint64 operations)
+double benchmarkTypedRead(Uint64 operations)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolConfig());
-    Populate(pool, operations);
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolOptions());
+    populate(pool, operations);
     auto statement = pool.read().prepare("SELECT id, value FROM benchmark_values");
     Uint64 count = 0;
     Uint64 checksum = 0;
@@ -178,33 +178,33 @@ double BenchmarkTypedRead(Uint64 operations)
         checksum += statement.columnTextView(1).size();
         ++count;
     }
-    const auto elapsed = ElapsedSeconds(start);
+    const auto elapsed = elapsedSeconds(start);
     if (count != operations || (operations != 0 && checksum == 0)) {
         std::abort();
     }
     return elapsed;
 }
 
-double BenchmarkMaterializedRead(Uint64 operations)
+double benchmarkMaterializedRead(Uint64 operations)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolConfig());
-    Populate(pool, operations);
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolOptions());
+    populate(pool, operations);
     auto reader = pool.read();
     const auto start = Clock::now();
     const auto rows = reader.query("SELECT id, value FROM benchmark_values");
-    const auto elapsed = ElapsedSeconds(start);
+    const auto elapsed = elapsedSeconds(start);
     if (rows.size() != operations) {
         std::abort();
     }
     return elapsed;
 }
 
-double BenchmarkConcurrentReads(Uint64 operations)
+double benchmarkConcurrentReads(Uint64 operations)
 {
     constexpr std::size_t kThreads = 4;
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolConfig(kThreads));
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolOptions(kThreads));
     std::atomic<Uint64> completed{0};
     std::vector<std::thread> threads;
     threads.reserve(kThreads);
@@ -224,7 +224,7 @@ double BenchmarkConcurrentReads(Uint64 operations)
     for (auto &thread : threads) {
         thread.join();
     }
-    const auto elapsed = ElapsedSeconds(start);
+    const auto elapsed = elapsedSeconds(start);
     if (completed.load(std::memory_order_relaxed) != operations) {
         std::abort();
     }
@@ -232,10 +232,10 @@ double BenchmarkConcurrentReads(Uint64 operations)
 }
 
 #ifndef NOVAINFRA_NO_EXCEPTIONS
-double BenchmarkSqliteError(Uint64 operations)
+double benchmarkSqliteError(Uint64 operations)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolConfig());
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolOptions());
     auto reader = pool.read();
     Uint64 caught = 0;
     const auto start = Clock::now();
@@ -246,7 +246,7 @@ double BenchmarkSqliteError(Uint64 operations)
             ++caught;
         }
     }
-    const auto elapsed = ElapsedSeconds(start);
+    const auto elapsed = elapsedSeconds(start);
     if (caught != operations) {
         std::abort();
     }
@@ -254,10 +254,10 @@ double BenchmarkSqliteError(Uint64 operations)
 }
 #endif
 
-void RunQueryLatency(std::size_t count)
+void runQueryLatency(std::size_t count)
 {
     TempDatabase database;
-    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolConfig(4));
+    novainfra::sqlitepool::ConnectionPool pool(database.string(), PoolOptions(4));
     std::vector<double> samples;
     samples.reserve(count);
     const auto start = Clock::now();
@@ -295,16 +295,16 @@ int main(int argc, char **argv)
 #endif
     std::cerr << "  samples: " << kMeasuredSamples << " measured after one warmup\n\n";
 
-    RunQueryLatency(10000);
-    RunBenchmark("read connection lease", kLeaseOperations, BenchmarkReadLease);
-    RunBenchmark("prepared insert/transaction", kWriteOperations, BenchmarkPreparedWrites);
-    RunBenchmark("manual BEGIN/COMMIT", kTransactionOperations, BenchmarkManualTransaction);
-    RunBenchmark("transaction std::function", kTransactionOperations, BenchmarkTransactionCallback);
-    RunBenchmark("typed step read", kReadRows, BenchmarkTypedRead);
-    RunBenchmark("RowSet materialization", kReadRows, BenchmarkMaterializedRead);
-    RunBenchmark("read 4 threads", kConcurrentOperations, BenchmarkConcurrentReads);
+    runQueryLatency(10000);
+    runBenchmark("read connection lease", kLeaseOperations, benchmarkReadLease);
+    runBenchmark("prepared insert/transaction", kWriteOperations, benchmarkPreparedWrites);
+    runBenchmark("manual BEGIN/COMMIT", kTransactionOperations, benchmarkManualTransaction);
+    runBenchmark("transaction std::function", kTransactionOperations, benchmarkTransactionCallback);
+    runBenchmark("typed step read", kReadRows, benchmarkTypedRead);
+    runBenchmark("RowSet materialization", kReadRows, benchmarkMaterializedRead);
+    runBenchmark("read 4 threads", kConcurrentOperations, benchmarkConcurrentReads);
 #ifndef NOVAINFRA_NO_EXCEPTIONS
-    RunBenchmark("SQLite error throw/catch", kErrorOperations, BenchmarkSqliteError);
+    runBenchmark("SQLite error throw/catch", kErrorOperations, benchmarkSqliteError);
 #endif
     return 0;
 }

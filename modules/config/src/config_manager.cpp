@@ -216,7 +216,7 @@ struct ConfigManager::Impl {
 };
 
 ConfigManager::ConfigManager() : impl_(std::make_shared<Impl>()) {}
-ConfigManager &ConfigManager::operator=(ConfigManager &&other) noexcept
+ConfigManager &ConfigManager::operator=(ConfigManager &&other) NOVAINFRA_NOEXCEPT
 {
     if (this != &other) {
         if (impl_)
@@ -392,12 +392,12 @@ void ConfigManager::stopWatching()
     if (impl_)
         impl_->stop();
 }
-bool ConfigManager::watching() const noexcept
+bool ConfigManager::watching() const NOVAINFRA_NOEXCEPT
 {
     return impl_ && impl_->watching.load();
 }
 
-std::exception_ptr ConfigManager::watchFailure() const noexcept
+std::exception_ptr ConfigManager::watchFailure() const NOVAINFRA_NOEXCEPT
 {
     if (!impl_)
         return nullptr;

@@ -34,9 +34,9 @@ public:
 int main()
 {
     const std::string filename =
-        "/tmp/novainfra_logger_no_exceptions_" + std::to_string(novainfra::core::Pid()) + ".log";
+        "/tmp/novainfra_logger_no_exceptions_" + std::to_string(novainfra::core::pid()) + ".log";
     const std::string rotatingFilename =
-        "/tmp/novainfra_rotating_no_exceptions_" + std::to_string(novainfra::core::Pid()) + ".log";
+        "/tmp/novainfra_rotating_no_exceptions_" + std::to_string(novainfra::core::pid()) + ".log";
     using RotatingSink = novainfra::log::sinks::RotatingFileSink<std::mutex>;
     const auto rotatingHistoryFilename = RotatingSink::calcFilename(rotatingFilename, 1);
     bool valid = false;
@@ -113,8 +113,8 @@ int main()
         novainfra::log::shutdown();
     }
 
-    novainfra::core::RemoveIfExists(filename);
-    novainfra::core::RemoveIfExists(rotatingFilename);
-    novainfra::core::RemoveIfExists(rotatingHistoryFilename);
+    novainfra::core::removeIfExists(filename);
+    novainfra::core::removeIfExists(rotatingFilename);
+    novainfra::core::removeIfExists(rotatingHistoryFilename);
     return valid && asyncValid && callbackValid && registryValid ? 0 : 1;
 }

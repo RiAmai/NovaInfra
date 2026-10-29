@@ -237,19 +237,19 @@ private:
     bool released_{false};
 };
 
-static_assert(std::is_move_constructible<novainfra::log::details::AsyncLogMsg>::value,
+static_assert(std::is_move_constructible<novainfra::log::detail::AsyncLogMsg>::value,
               "AsyncLogMsg must be movable");
-static_assert(std::is_move_assignable<novainfra::log::details::AsyncLogMsg>::value,
+static_assert(std::is_move_assignable<novainfra::log::detail::AsyncLogMsg>::value,
               "AsyncLogMsg must be move assignable");
-static_assert(!std::is_copy_constructible<novainfra::log::details::AsyncLogMsg>::value,
+static_assert(!std::is_copy_constructible<novainfra::log::detail::AsyncLogMsg>::value,
               "AsyncLogMsg must not be copied");
-static_assert(!std::is_copy_assignable<novainfra::log::details::AsyncLogMsg>::value,
+static_assert(!std::is_copy_assignable<novainfra::log::detail::AsyncLogMsg>::value,
               "AsyncLogMsg must not be copied");
-static_assert(sizeof(novainfra::log::details::AsyncLogMsg) <= 432,
+static_assert(sizeof(novainfra::log::detail::AsyncLogMsg) <= 432,
               "AsyncLogMsg queue payload must stay compact");
 
 template <typename Predicate>
-bool WaitUntil(Predicate predicate, std::chrono::milliseconds timeout = 2s)
+bool waitUntil(Predicate predicate, std::chrono::milliseconds timeout = 2s)
 {
     const auto deadline = std::chrono::steady_clock::now() + timeout;
     while (!predicate()) {
@@ -345,15 +345,15 @@ TEST(AsyncLogMsg, MoveOperationsRebindOwnedDynamicFields)
         message
     };
 
-    novainfra::log::details::AsyncLogMsg first(std::shared_ptr<novainfra::log::async::AsyncLogger>{},
-                                               novainfra::log::details::AsyncMsgType::LOG,
+    novainfra::log::detail::AsyncLogMsg first(std::shared_ptr<novainfra::log::async::AsyncLogger>{},
+                                               novainfra::log::detail::AsyncMsgType::LOG,
                                                std::move(logMessage));
     message.assign(2048, 'm');
     file.assign(2048, 'f');
     function.assign(2048, 'x');
 
-    novainfra::log::details::AsyncLogMsg second(std::move(first));
-    novainfra::log::details::AsyncLogMsg third(novainfra::log::details::AsyncMsgType::FLUSH);
+    novainfra::log::detail::AsyncLogMsg second(std::move(first));
+    novainfra::log::detail::AsyncLogMsg third(novainfra::log::detail::AsyncMsgType::FLUSH);
     third = std::move(second);
 
     EXPECT_EQ(third.message, expectedMessage);
@@ -368,11 +368,11 @@ TEST(AsyncLogMsg, MoveOperationsPreserveStaticSourceMarker)
     constexpr auto source = novainfra::log::SourceLocation::fromStatic("static.cpp", 17, "staticFunction");
     novainfra::log::LogMsg logMessage{
         novainfra::SystemTimePoint{}, novainfra::log::Level::INFO, 7, source, "logger", "message"};
-    novainfra::log::details::AsyncLogMsg first(std::shared_ptr<novainfra::log::async::AsyncLogger>{},
-                                               novainfra::log::details::AsyncMsgType::LOG,
+    novainfra::log::detail::AsyncLogMsg first(std::shared_ptr<novainfra::log::async::AsyncLogger>{},
+                                               novainfra::log::detail::AsyncMsgType::LOG,
                                                std::move(logMessage));
 
-    novainfra::log::details::AsyncLogMsg second(std::move(first));
+    novainfra::log::detail::AsyncLogMsg second(std::move(first));
 
     EXPECT_EQ(second.source.file, "static.cpp");
     EXPECT_EQ(second.source.function, "staticFunction");
@@ -423,7 +423,7 @@ TEST(AsyncLogger, ReleasesProcessedLoggerBeforeWorkerShutdown)
         logger->info("message");
     }
 
-    ASSERT_TRUE(WaitUntil([&] { return weakLogger.expired(); }));
+    ASSERT_TRUE(waitUntil([&] { return weakLogger.expired(); }));
     ASSERT_EQ(sink->messages().size(), 1U);
     EXPECT_GE(sink->flushCount(), 1);
 
@@ -444,7 +444,7 @@ TEST(AsyncLogger, LoggerChurnDoesNotAccumulateStrongWorkerReferences)
         logger->info("{}", index);
     }
 
-    ASSERT_TRUE(WaitUntil([&] {
+    ASSERT_TRUE(waitUntil([&] {
         return std::all_of(weakLoggers.begin(), weakLoggers.end(),
                            [](const auto &logger) { return logger.expired(); });
     }));

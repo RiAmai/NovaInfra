@@ -25,7 +25,7 @@ struct RecordedMessage {
 class RecordingSink NOVAINFRA_FINAL : public novainfra::log::sinks::ISink
 {
 public:
-    void log(const novainfra::log::details::LogMsg &msg) NOVAINFRA_OVERRIDE
+    void log(const novainfra::log::detail::LogMsg &msg) NOVAINFRA_OVERRIDE
     {
         messages.push_back({msg.level, std::string(msg.message)});
     }
@@ -39,7 +39,7 @@ public:
 
 TEST(LogMsg, ConstructorPreservesLevel)
 {
-    const novainfra::log::details::LogMsg message{"test", novainfra::log::Level::ERROR, "failure"};
+    const novainfra::log::detail::LogMsg message{"test", novainfra::log::Level::ERROR, "failure"};
     EXPECT_EQ(message.level, novainfra::log::Level::ERROR);
 }
 
@@ -78,7 +78,7 @@ TEST(LoggerBacktrace, BuffersFilteredMessagesAndDrainsLatestEntries)
 TEST(LoggerBacktrace, DumpFlushesFileSinkBeforeReturning)
 {
     const auto path = std::filesystem::temp_directory_path() /
-                      ("novainfra_backtrace_" + std::to_string(novainfra::core::Pid()) + "_" +
+                      ("novainfra_backtrace_" + std::to_string(novainfra::core::pid()) + "_" +
                        std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".log");
     auto sink = std::make_shared<novainfra::log::sinks::BasicFileSink<std::mutex>>(path.string(), true);
     sink->setPattern("%v");

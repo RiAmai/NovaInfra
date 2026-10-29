@@ -34,8 +34,8 @@ public:
 
     static Registry &instance()
     {
-        static Registry pvtInst;
-        return pvtInst;
+        static Registry registry;
+        return registry;
     }
 
     void registerLogger(std::shared_ptr<Logger> newLogger);
@@ -44,7 +44,7 @@ public:
 
     void setDefaultLogger(std::shared_ptr<Logger> newDefaultLogger);
     std::shared_ptr<Logger> defaultLogger() const NOVAINFRA_NOEXCEPT;
-    std::shared_ptr<Logger> getNameLogger(const std::string &name) const;
+    std::shared_ptr<Logger> findLogger(const std::string &name) const;
 
     void setLevel(Level level);
     void setLevels(LogLevels levels, const Level *globalLevel = nullptr);

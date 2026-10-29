@@ -51,7 +51,7 @@ std::shared_ptr<Logger> AsyncLogger::clone(std::string name)
     return cloned;
 }
 
-void AsyncLogger::sinkIt(const details::LogMsg &msg)
+void AsyncLogger::sinkIt(const detail::LogMsg &msg)
 {
     NOVAINFRA_TRY
     {
@@ -66,7 +66,7 @@ void AsyncLogger::sinkIt(const details::LogMsg &msg)
         }
         errHandler("async log: worker thread doesn't exist anymore");
     }
-    NOVAINFRA_LOG_DETAILS_CATCH(msg.source)
+    NOVAINFRA_LOG_DETAIL_CATCH(msg.source)
 }
 
 void AsyncLogger::_flush()
@@ -84,10 +84,10 @@ void AsyncLogger::_flush()
         }
         errHandler("async flush: worker thread doesn't exist anymore");
     }
-    NOVAINFRA_LOG_DETAILS_CATCH(SourceLocation())
+    NOVAINFRA_LOG_DETAIL_CATCH(SourceLocation())
 }
 
-void AsyncLogger::backendSinkIt(const details::LogMsg &incomingLogMsg)
+void AsyncLogger::backendSinkIt(const detail::LogMsg &incomingLogMsg)
 {
     for (auto &sink : sinks_) {
         if (!sink) {
@@ -99,7 +99,7 @@ void AsyncLogger::backendSinkIt(const details::LogMsg &incomingLogMsg)
             {
                 sink->log(incomingLogMsg);
             }
-            NOVAINFRA_LOG_DETAILS_CATCH(incomingLogMsg.source)
+            NOVAINFRA_LOG_DETAIL_CATCH(incomingLogMsg.source)
         }
     }
 }
@@ -133,7 +133,7 @@ void AsyncLogger::backendFlush()
         {
             sink->flush();
         }
-        NOVAINFRA_LOG_DETAILS_CATCH(SourceLocation())
+        NOVAINFRA_LOG_DETAIL_CATCH(SourceLocation())
     }
 }
 

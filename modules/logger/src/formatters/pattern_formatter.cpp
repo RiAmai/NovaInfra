@@ -16,7 +16,7 @@ NOVAINFRA_NAMESPACE_BEGIN
 namespace log::formatters {
 namespace {
 template <typename Integer>
-void AppendInteger(Integer value, std::string &dst)
+void appendInteger(Integer value, std::string &dst)
 {
     char buffer[32];
     const auto result = std::to_chars(std::begin(buffer), std::end(buffer), value);
@@ -26,7 +26,7 @@ void AppendInteger(Integer value, std::string &dst)
 }
 
 template <typename Integer>
-void AppendIntegerPaddedFallback(Integer value, std::size_t width, std::string &dst)
+void appendIntegerPaddedFallback(Integer value, std::size_t width, std::string &dst)
 {
     char buffer[32];
     const auto result = std::to_chars(std::begin(buffer), std::end(buffer), value);
@@ -41,38 +41,38 @@ void AppendIntegerPaddedFallback(Integer value, std::size_t width, std::string &
     dst.append(buffer, result.ptr);
 }
 
-void WriteTwoDigits(novainfra::Uint32 value, char *dst)
+void writeTwoDigits(novainfra::Uint32 value, char *dst)
 {
     dst[0] = static_cast<char>('0' + value / 10);
     dst[1] = static_cast<char>('0' + value % 10);
 }
 
-void WriteThreeDigits(novainfra::Uint32 value, char *dst)
+void writeThreeDigits(novainfra::Uint32 value, char *dst)
 {
     dst[0] = static_cast<char>('0' + value / 100);
-    WriteTwoDigits(value % 100, dst + 1);
+    writeTwoDigits(value % 100, dst + 1);
 }
 
-void AppendTwoDigits(novainfra::Uint32 value, std::string &dst)
+void appendTwoDigits(novainfra::Uint32 value, std::string &dst)
 {
     const auto offset = dst.size();
     dst.resize(offset + 2);
-    WriteTwoDigits(value, dst.data() + offset);
+    writeTwoDigits(value, dst.data() + offset);
 }
 
-void AppendThreeDigits(novainfra::Uint32 value, std::string &dst)
+void appendThreeDigits(novainfra::Uint32 value, std::string &dst)
 {
     const auto offset = dst.size();
     dst.resize(offset + 3);
-    WriteThreeDigits(value, dst.data() + offset);
+    writeThreeDigits(value, dst.data() + offset);
 }
 
 template <typename Integer>
-void AppendIntegerPadded(Integer value, std::size_t width, std::string &dst)
+void appendIntegerPadded(Integer value, std::size_t width, std::string &dst)
 {
     if constexpr (std::is_signed<Integer>::value) {
         if (value < 0) {
-            AppendIntegerPaddedFallback(value, width, dst);
+            appendIntegerPaddedFallback(value, width, dst);
             return;
         }
     }
@@ -81,13 +81,13 @@ void AppendIntegerPadded(Integer value, std::size_t width, std::string &dst)
     switch (width) {
         case 2:
             if (unsignedValue < 100) {
-                AppendTwoDigits(static_cast<novainfra::Uint32>(unsignedValue), dst);
+                appendTwoDigits(static_cast<novainfra::Uint32>(unsignedValue), dst);
                 return;
             }
             break;
         case 3:
             if (unsignedValue < 1'000) {
-                AppendThreeDigits(static_cast<novainfra::Uint32>(unsignedValue), dst);
+                appendThreeDigits(static_cast<novainfra::Uint32>(unsignedValue), dst);
                 return;
             }
             break;
@@ -95,8 +95,8 @@ void AppendIntegerPadded(Integer value, std::size_t width, std::string &dst)
             if (unsignedValue < 1'000'000) {
                 const auto offset = dst.size();
                 dst.resize(offset + 6);
-                WriteThreeDigits(static_cast<novainfra::Uint32>(unsignedValue / 1'000), dst.data() + offset);
-                WriteThreeDigits(static_cast<novainfra::Uint32>(unsignedValue % 1'000),
+                writeThreeDigits(static_cast<novainfra::Uint32>(unsignedValue / 1'000), dst.data() + offset);
+                writeThreeDigits(static_cast<novainfra::Uint32>(unsignedValue % 1'000),
                                  dst.data() + offset + 3);
                 return;
             }
@@ -105,11 +105,11 @@ void AppendIntegerPadded(Integer value, std::size_t width, std::string &dst)
             if (unsignedValue < 1'000'000'000) {
                 const auto offset = dst.size();
                 dst.resize(offset + 9);
-                WriteThreeDigits(static_cast<novainfra::Uint32>(unsignedValue / 1'000'000),
+                writeThreeDigits(static_cast<novainfra::Uint32>(unsignedValue / 1'000'000),
                                  dst.data() + offset);
-                WriteThreeDigits(static_cast<novainfra::Uint32>((unsignedValue / 1'000) % 1'000),
+                writeThreeDigits(static_cast<novainfra::Uint32>((unsignedValue / 1'000) % 1'000),
                                  dst.data() + offset + 3);
-                WriteThreeDigits(static_cast<novainfra::Uint32>(unsignedValue % 1'000),
+                writeThreeDigits(static_cast<novainfra::Uint32>(unsignedValue % 1'000),
                                  dst.data() + offset + 6);
                 return;
             }
@@ -117,11 +117,11 @@ void AppendIntegerPadded(Integer value, std::size_t width, std::string &dst)
         default:
             break;
     }
-    AppendIntegerPaddedFallback(value, width, dst);
+    appendIntegerPaddedFallback(value, width, dst);
 }
 
 template <typename Duration>
-novainfra::Int64 FractionalPart(novainfra::SystemTimePoint timestamp)
+novainfra::Int64 fractionalPart(novainfra::SystemTimePoint timestamp)
 {
     const auto sinceEpoch = timestamp.time_since_epoch();
     if (sinceEpoch >= novainfra::SystemClock::duration::zero()) {
@@ -134,7 +134,7 @@ novainfra::Int64 FractionalPart(novainfra::SystemTimePoint timestamp)
         std::chrono::duration_cast<Duration>(sinceEpoch - wholeSeconds).count());
 }
 
-std::string_view LevelToString(novainfra::log::Level level)
+std::string_view levelToString(novainfra::log::Level level)
 {
     switch (level) {
         case novainfra::log::Level::TRACE:
@@ -154,18 +154,18 @@ std::string_view LevelToString(novainfra::log::Level level)
     }
 }
 
-const char *AmPm(const std::tm &time)
+const char *amPm(const std::tm &time)
 {
     return time.tm_hour >= 12 ? "PM" : "AM";
 }
 
-int To12Hour(const std::tm &time)
+int to12Hour(const std::tm &time)
 {
     const auto hour = time.tm_hour % 12;
     return hour == 0 ? 12 : hour;
 }
 
-std::string_view Basename(std::string_view filename)
+std::string_view baseName(std::string_view filename)
 {
     const auto position = filename.find_last_of(novainfra::core::kFolderSeps);
     return position == std::string_view::npos ? filename : filename.substr(position + 1);
@@ -216,7 +216,7 @@ PatternFormatter::PatternFormatter(std::string pattern, PatternTimeType timeType
     needLocaltime_ = compiled.needLocaltime;
 }
 
-void PatternFormatter::format(const details::LogMsg &msg, std::string &dst)
+void PatternFormatter::format(const detail::LogMsg &msg, std::string &dst)
 {
     if (program_.size() == 1 && program_.front().code == OpCode::MESSAGE) {
         const auto requiredCapacity = dst.size() + msg.message.size() + eol_.size();
@@ -255,10 +255,10 @@ void PatternFormatter::format(const details::LogMsg &msg, std::string &dst)
                 dst.append(msg.loggerName);
                 break;
             case OpCode::LEVEL:
-                dst.append(LevelToString(msg.level));
+                dst.append(levelToString(msg.level));
                 break;
             case OpCode::THREAD_ID:
-                AppendInteger(msg.threadId, dst);
+                appendInteger(msg.threadId, dst);
                 break;
             case OpCode::MESSAGE:
                 dst.append(msg.message);
@@ -280,103 +280,103 @@ void PatternFormatter::format(const details::LogMsg &msg, std::string &dst)
                 dst.push_back(' ');
                 dst.append(kMonths[static_cast<std::size_t>(cachedTm_.tm_mon)]);
                 dst.push_back(' ');
-                AppendIntegerPadded(cachedTm_.tm_mday, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_mday, 2, dst);
                 dst.push_back(' ');
-                AppendIntegerPadded(cachedTm_.tm_hour, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_hour, 2, dst);
                 dst.push_back(':');
-                AppendIntegerPadded(cachedTm_.tm_min, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_min, 2, dst);
                 dst.push_back(':');
-                AppendIntegerPadded(cachedTm_.tm_sec, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_sec, 2, dst);
                 dst.push_back(' ');
-                AppendInteger(cachedTm_.tm_year + 1900, dst);
+                appendInteger(cachedTm_.tm_year + 1900, dst);
                 break;
             case OpCode::COMMON_DATE_TIME:
                 formatCommonDateTime(msg, cachedTm_, dateTimeStates_[operation.argument], operation.size != 0,
                                      dst);
                 break;
             case OpCode::YEAR_SHORT:
-                AppendIntegerPadded(cachedTm_.tm_year % 100, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_year % 100, 2, dst);
                 break;
             case OpCode::YEAR:
-                AppendInteger(cachedTm_.tm_year + 1900, dst);
+                appendInteger(cachedTm_.tm_year + 1900, dst);
                 break;
             case OpCode::DATE_SHORT:
-                AppendIntegerPadded(cachedTm_.tm_mon + 1, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_mon + 1, 2, dst);
                 dst.push_back('/');
-                AppendIntegerPadded(cachedTm_.tm_mday, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_mday, 2, dst);
                 dst.push_back('/');
-                AppendIntegerPadded(cachedTm_.tm_year % 100, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_year % 100, 2, dst);
                 break;
             case OpCode::MONTH:
-                AppendIntegerPadded(cachedTm_.tm_mon + 1, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_mon + 1, 2, dst);
                 break;
             case OpCode::DAY:
-                AppendIntegerPadded(cachedTm_.tm_mday, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_mday, 2, dst);
                 break;
             case OpCode::HOUR_24:
-                AppendIntegerPadded(cachedTm_.tm_hour, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_hour, 2, dst);
                 break;
             case OpCode::HOUR_12:
-                AppendIntegerPadded(To12Hour(cachedTm_), 2, dst);
+                appendIntegerPadded(to12Hour(cachedTm_), 2, dst);
                 break;
             case OpCode::MINUTE:
-                AppendIntegerPadded(cachedTm_.tm_min, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_min, 2, dst);
                 break;
             case OpCode::SECOND:
-                AppendIntegerPadded(cachedTm_.tm_sec, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_sec, 2, dst);
                 break;
             case OpCode::MILLISECOND:
-                AppendIntegerPadded(FractionalPart<std::chrono::milliseconds>(msg.timestamp), 3, dst);
+                appendIntegerPadded(fractionalPart<std::chrono::milliseconds>(msg.timestamp), 3, dst);
                 break;
             case OpCode::MICROSECOND:
-                AppendIntegerPadded(FractionalPart<std::chrono::microseconds>(msg.timestamp), 6, dst);
+                appendIntegerPadded(fractionalPart<std::chrono::microseconds>(msg.timestamp), 6, dst);
                 break;
             case OpCode::NANOSECOND:
-                AppendIntegerPadded(FractionalPart<std::chrono::nanoseconds>(msg.timestamp), 9, dst);
+                appendIntegerPadded(fractionalPart<std::chrono::nanoseconds>(msg.timestamp), 9, dst);
                 break;
             case OpCode::EPOCH_SECOND:
-                AppendInteger(
+                appendInteger(
                     std::chrono::duration_cast<std::chrono::seconds>(msg.timestamp.time_since_epoch())
                         .count(),
                     dst);
                 break;
             case OpCode::AM_PM:
-                dst.append(AmPm(cachedTm_));
+                dst.append(amPm(cachedTm_));
                 break;
             case OpCode::CLOCK_12:
-                AppendIntegerPadded(To12Hour(cachedTm_), 2, dst);
+                appendIntegerPadded(to12Hour(cachedTm_), 2, dst);
                 dst.push_back(':');
-                AppendIntegerPadded(cachedTm_.tm_min, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_min, 2, dst);
                 dst.push_back(':');
-                AppendIntegerPadded(cachedTm_.tm_sec, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_sec, 2, dst);
                 dst.push_back(' ');
-                dst.append(AmPm(cachedTm_));
+                dst.append(amPm(cachedTm_));
                 break;
             case OpCode::CLOCK_24:
-                AppendIntegerPadded(cachedTm_.tm_hour, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_hour, 2, dst);
                 dst.push_back(':');
-                AppendIntegerPadded(cachedTm_.tm_min, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_min, 2, dst);
                 break;
             case OpCode::CLOCK_ISO:
-                AppendIntegerPadded(cachedTm_.tm_hour, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_hour, 2, dst);
                 dst.push_back(':');
-                AppendIntegerPadded(cachedTm_.tm_min, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_min, 2, dst);
                 dst.push_back(':');
-                AppendIntegerPadded(cachedTm_.tm_sec, 2, dst);
+                appendIntegerPadded(cachedTm_.tm_sec, 2, dst);
                 break;
             case OpCode::PID:
-                AppendInteger(static_cast<Uint32>(core::Pid()), dst);
+                appendInteger(static_cast<Uint32>(core::pid()), dst);
                 break;
             case OpCode::SOURCE_LOCATION:
                 if (!msg.source.empty()) {
                     dst.append(msg.source.file);
                     dst.push_back(':');
-                    AppendInteger(msg.source.line, dst);
+                    appendInteger(msg.source.line, dst);
                 }
                 break;
             case OpCode::SOURCE_FILENAME_SHORT:
                 if (!msg.source.empty()) {
-                    dst.append(Basename(msg.source.file));
+                    dst.append(baseName(msg.source.file));
                 }
                 break;
             case OpCode::SOURCE_FILENAME:
@@ -386,7 +386,7 @@ void PatternFormatter::format(const details::LogMsg &msg, std::string &dst)
                 break;
             case OpCode::SOURCE_LINE:
                 if (!msg.source.empty()) {
-                    AppendInteger(msg.source.line, dst);
+                    appendInteger(msg.source.line, dst);
                 }
                 break;
             case OpCode::SOURCE_FUNCTION:
@@ -411,19 +411,19 @@ void PatternFormatter::format(const details::LogMsg &msg, std::string &dst)
                 state.lastMessageTime = msg.timestamp;
                 switch (operation.code) {
                     case OpCode::ELAPSED_NANOSECOND:
-                        AppendInteger(std::chrono::duration_cast<std::chrono::nanoseconds>(delta).count(),
+                        appendInteger(std::chrono::duration_cast<std::chrono::nanoseconds>(delta).count(),
                                       dst);
                         break;
                     case OpCode::ELAPSED_MICROSECOND:
-                        AppendInteger(std::chrono::duration_cast<std::chrono::microseconds>(delta).count(),
+                        appendInteger(std::chrono::duration_cast<std::chrono::microseconds>(delta).count(),
                                       dst);
                         break;
                     case OpCode::ELAPSED_MILLISECOND:
-                        AppendInteger(std::chrono::duration_cast<std::chrono::milliseconds>(delta).count(),
+                        appendInteger(std::chrono::duration_cast<std::chrono::milliseconds>(delta).count(),
                                       dst);
                         break;
                     case OpCode::ELAPSED_SECOND:
-                        AppendInteger(std::chrono::duration_cast<std::chrono::seconds>(delta).count(), dst);
+                        appendInteger(std::chrono::duration_cast<std::chrono::seconds>(delta).count(), dst);
                         break;
                     default:
                         break;
@@ -463,29 +463,29 @@ void PatternFormatter::setPattern(std::string pattern)
 std::tm PatternFormatter::getTime(SystemTimePoint timestamp) const
 {
     if (patternTimeType_ == PatternTimeType::LOCAL) {
-        return core::Localtime(SystemClock::to_time_t(timestamp));
+        return core::localTime(SystemClock::to_time_t(timestamp));
     }
-    return core::Gmtime(SystemClock::to_time_t(timestamp));
+    return core::gmTime(SystemClock::to_time_t(timestamp));
 }
 
-void PatternFormatter::formatFull(const details::LogMsg &msg, const std::tm &time, FullState &state,
+void PatternFormatter::formatFull(const detail::LogMsg &msg, const std::tm &time, FullState &state,
                                   std::string &dst)
 {
     const auto seconds = lastLogSecs_;
     if (!state.initialized || state.cachedSecond != seconds) {
         state.cachedDatetime.clear();
         state.cachedDatetime.push_back('[');
-        AppendInteger(time.tm_year + 1900, state.cachedDatetime);
+        appendInteger(time.tm_year + 1900, state.cachedDatetime);
         state.cachedDatetime.push_back('-');
-        AppendIntegerPadded(time.tm_mon + 1, 2, state.cachedDatetime);
+        appendIntegerPadded(time.tm_mon + 1, 2, state.cachedDatetime);
         state.cachedDatetime.push_back('-');
-        AppendIntegerPadded(time.tm_mday, 2, state.cachedDatetime);
+        appendIntegerPadded(time.tm_mday, 2, state.cachedDatetime);
         state.cachedDatetime.push_back(' ');
-        AppendIntegerPadded(time.tm_hour, 2, state.cachedDatetime);
+        appendIntegerPadded(time.tm_hour, 2, state.cachedDatetime);
         state.cachedDatetime.push_back(':');
-        AppendIntegerPadded(time.tm_min, 2, state.cachedDatetime);
+        appendIntegerPadded(time.tm_min, 2, state.cachedDatetime);
         state.cachedDatetime.push_back(':');
-        AppendIntegerPadded(time.tm_sec, 2, state.cachedDatetime);
+        appendIntegerPadded(time.tm_sec, 2, state.cachedDatetime);
         state.cachedDatetime.push_back('.');
         state.cachedSecond = seconds;
         state.initialized = true;
@@ -505,7 +505,7 @@ void PatternFormatter::formatFull(const details::LogMsg &msg, const std::tm &tim
         sourceLineSize = static_cast<std::size_t>(sourceLineResult.ptr - sourceLineBuffer);
     }
 
-    const auto level = LevelToString(msg.level);
+    const auto level = levelToString(msg.level);
     constexpr std::string_view kCloseOpen{"] ["};
     constexpr std::string_view kThreadPrefix{"] [tid="};
     constexpr std::string_view kCloseSpace{"] "};
@@ -529,7 +529,7 @@ void PatternFormatter::formatFull(const details::LogMsg &msg, const std::tm &tim
     const auto milliseconds = static_cast<Uint32>(
         std::chrono::duration_cast<std::chrono::milliseconds>(msg.timestamp.time_since_epoch() - seconds)
             .count());
-    WriteThreeDigits(milliseconds, cursor);
+    writeThreeDigits(milliseconds, cursor);
     cursor += 3;
     copyField(kCloseOpen);
     copyField(level);
@@ -548,23 +548,23 @@ void PatternFormatter::formatFull(const details::LogMsg &msg, const std::tm &tim
     copyField(msg.message);
 }
 
-void PatternFormatter::formatCommonDateTime(const details::LogMsg &msg, const std::tm &time,
+void PatternFormatter::formatCommonDateTime(const detail::LogMsg &msg, const std::tm &time,
                                             DateTimeState &state, bool withMilliseconds, std::string &dst)
 {
     const auto seconds = lastLogSecs_;
     if (!state.initialized || state.cachedSecond != seconds) {
         state.cachedPrefix.clear();
-        AppendInteger(time.tm_year + 1900, state.cachedPrefix);
+        appendInteger(time.tm_year + 1900, state.cachedPrefix);
         state.cachedPrefix.push_back('-');
-        AppendIntegerPadded(time.tm_mon + 1, 2, state.cachedPrefix);
+        appendIntegerPadded(time.tm_mon + 1, 2, state.cachedPrefix);
         state.cachedPrefix.push_back('-');
-        AppendIntegerPadded(time.tm_mday, 2, state.cachedPrefix);
+        appendIntegerPadded(time.tm_mday, 2, state.cachedPrefix);
         state.cachedPrefix.push_back(' ');
-        AppendIntegerPadded(time.tm_hour, 2, state.cachedPrefix);
+        appendIntegerPadded(time.tm_hour, 2, state.cachedPrefix);
         state.cachedPrefix.push_back(':');
-        AppendIntegerPadded(time.tm_min, 2, state.cachedPrefix);
+        appendIntegerPadded(time.tm_min, 2, state.cachedPrefix);
         state.cachedPrefix.push_back(':');
-        AppendIntegerPadded(time.tm_sec, 2, state.cachedPrefix);
+        appendIntegerPadded(time.tm_sec, 2, state.cachedPrefix);
         if (withMilliseconds) {
             state.cachedPrefix.push_back('.');
         }
@@ -573,7 +573,7 @@ void PatternFormatter::formatCommonDateTime(const details::LogMsg &msg, const st
     }
     dst.append(state.cachedPrefix);
     if (withMilliseconds) {
-        AppendIntegerPadded(
+        appendIntegerPadded(
             std::chrono::duration_cast<std::chrono::milliseconds>(msg.timestamp.time_since_epoch() - seconds)
                 .count(),
             3, dst);

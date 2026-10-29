@@ -13,9 +13,9 @@ if(NOT NOVAINFRA_NO_EXCEPTIONS)
     endif()
 
     include(GoogleTest)
-    add_executable(novainfra_sqlitepool_tests sqlite_pool_tests.cpp)
-    target_link_libraries(novainfra_sqlitepool_tests PRIVATE NovaInfra::SqlitePool GTest::gtest_main)
-    gtest_discover_tests(novainfra_sqlitepool_tests DISCOVERY_MODE PRE_TEST)
+    add_executable(novainfra_sqlite_pool_tests sqlite_pool_tests.cpp)
+    target_link_libraries(novainfra_sqlite_pool_tests PRIVATE NovaInfra::SqlitePool GTest::gtest_main)
+    gtest_discover_tests(novainfra_sqlite_pool_tests DISCOVERY_MODE PRE_TEST)
 endif()
 
 foreach(SQLITE_POOL_HEADER IN ITEMS sqlite_pool/connection_pool.h sqlite_pool/read_conn.h sqlite_pool/write_conn.h sqlite_pool/statement.h sqlite_pool/sqlite_error.h sqlite_pool/types.h)

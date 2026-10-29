@@ -22,8 +22,8 @@ public:
     DispatchReport publish(std::type_index type, const void *event);
     AsyncPublishStatus enqueue(std::type_index type, std::shared_ptr<const void> event, bool mayBlock);
     void shutdown(ShutdownMode mode);
-    bool accepting() const noexcept;
-    EventBusStats stats() const noexcept;
+    bool accepting() const NOVAINFRA_NOEXCEPT;
+    EventBusStats stats() const NOVAINFRA_NOEXCEPT;
 
 private:
     struct Impl;
@@ -46,7 +46,7 @@ public:
      */
     explicit EventBus(EventBusOptions options = {});
     /** @brief 关闭总线并释放内部资源。 */
-    ~EventBus() noexcept;
+    ~EventBus() NOVAINFRA_NOEXCEPT;
     NOVAINFRA_DISABLE_COPY_MOVE(EventBus)
 
     /**
@@ -122,9 +122,9 @@ public:
      */
     void shutdown(ShutdownMode mode = ShutdownMode::DRAIN);
     /** @brief 返回总线当前是否接受新事件。 */
-    bool accepting() const noexcept;
+    bool accepting() const NOVAINFRA_NOEXCEPT;
     /** @brief 返回总线统计快照。 */
-    EventBusStats stats() const noexcept;
+    EventBusStats stats() const NOVAINFRA_NOEXCEPT;
 
 private:
     std::shared_ptr<detail::State> state_;

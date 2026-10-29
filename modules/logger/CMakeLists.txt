@@ -22,8 +22,8 @@ file(GLOB LOGGER_PUBLIC_HEADERS
     "include/logger/formatters/*.h"
     "include/logger/sinks/*.h"
 )
-file(GLOB LOGGER_DETAIL_HEADERS "include/logger/details/*.h")
-file(GLOB LOGGER_SRCS "src/*.cpp" "src/async/*.cpp" "src/details/*.cpp" "src/formatters/*.cpp")
+file(GLOB LOGGER_DETAIL_HEADERS "include/logger/detail/*.h")
+file(GLOB LOGGER_SRCS "src/*.cpp" "src/async/*.cpp" "src/detail/*.cpp" "src/formatters/*.cpp")
 
 add_library(novainfra_logger ${LOGGER_SRCS} ${LOGGER_PUBLIC_HEADERS} ${LOGGER_DETAIL_HEADERS})
 add_library(NovaInfra::Logger ALIAS novainfra_logger)

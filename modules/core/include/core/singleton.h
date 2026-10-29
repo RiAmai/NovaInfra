@@ -12,11 +12,11 @@ class Singleton
 {
 public:
     typedef std::shared_ptr<T> Ptr;
-    static Ptr Instance()
+    static Ptr instance()
     {
         // 不要用std::make_shared，因为T构造函数是privte，只给了本地友元，没有给标准库友元
-        static Ptr pvtSingleton = Ptr(new T);
-        return pvtSingleton;
+        static Ptr singleton = Ptr(new T);
+        return singleton;
     }
 
 protected:

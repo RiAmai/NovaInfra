@@ -1,7 +1,7 @@
 #pragma once
 
 #include <logger/formatters/pattern_formatter.h>
-#include <logger/details/mutex.h>
+#include <logger/detail/mutex.h>
 #include <logger/sinks/sink.h>
 #include <mutex>
 #include <stdexcept>
@@ -24,7 +24,7 @@ public:
     virtual ~BaseSink() = default;
     NOVAINFRA_DISABLE_COPY_MOVE(BaseSink)
 
-    void log(const details::LogMsg &msg) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
+    void log(const detail::LogMsg &msg) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
         std::lock_guard<Mutex> lock(mutex_);
         _log(msg);
@@ -53,11 +53,11 @@ public:
 
     bool isThreadSafe() const NOVAINFRA_NOEXCEPT NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
-        return !std::is_same<Mutex, details::NullMutex>::value;
+        return !std::is_same<Mutex, detail::NullMutex>::value;
     }
 
 protected:
-    virtual void _log(const details::LogMsg &msg) = 0;
+    virtual void _log(const detail::LogMsg &msg) = 0;
     virtual void _flush() = 0;
 
     virtual void _setPattern(const std::string &pattern)
@@ -70,7 +70,7 @@ protected:
         formatter_ = std::move(formatter);
     }
 
-    const std::string &formatMessage(const details::LogMsg &msg)
+    const std::string &formatMessage(const detail::LogMsg &msg)
     {
         formattedBuffer_.clear();
         formatter_->format(msg, formattedBuffer_);

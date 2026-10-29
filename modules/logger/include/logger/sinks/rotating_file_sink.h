@@ -1,7 +1,7 @@
 #pragma once
 
-#include <logger/details/file_assistant.h>
-#include <logger/details/mutex.h>
+#include <logger/detail/file_assistant.h>
+#include <logger/detail/mutex.h>
 #include <logger/sinks/base_sink.h>
 #include <logger/sinks/file_event_handlers.h>
 
@@ -45,7 +45,7 @@ public:
 
         Filename basename;
         Filename ext;
-        std::tie(basename, ext) = details::FileAssistant::splitByExtension(name);
+        std::tie(basename, ext) = detail::FileAssistant::splitByExtension(name);
         return fmt::format(FMT_STRING(NOVAINFRA_FILENAME("{}.{}{}")), basename, idx, ext);
     }
 
@@ -67,7 +67,7 @@ public:
         std::lock_guard<Mutex> lock(BaseSink<Mutex>::mutex_);
         maxSize_ = size;
     }
-    std::size_t getMaxSize() const
+    std::size_t maxSize() const
     {
         std::lock_guard<Mutex> lock(BaseSink<Mutex>::mutex_);
         return maxSize_;
@@ -79,14 +79,14 @@ public:
         std::lock_guard<Mutex> lock(BaseSink<Mutex>::mutex_);
         maxFileNum_ = size;
     }
-    std::size_t getMaxFileNum() const
+    std::size_t maxFileNum() const
     {
         std::lock_guard<Mutex> lock(BaseSink<Mutex>::mutex_);
         return maxFileNum_;
     }
 
 protected:
-    void _log(const details::LogMsg &msg) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
+    void _log(const detail::LogMsg &msg) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
         const auto &formatted = BaseSink<Mutex>::formatMessage(msg);
 
@@ -136,19 +136,19 @@ private:
 
         for (std::size_t i = maxFileNum_; i > 0; --i) {
             Filename src = calcFilename(baseFilename_, i - 1);
-            if (!core::PathExists(src)) {
+            if (!core::pathExists(src)) {
                 continue;
             }
             Filename dst = calcFilename(baseFilename_, i);
             if (!renameFile(src, dst)) {
-                core::SleepForMillis(100);
+                core::sleepForMillis(100);
                 if (!renameFile(src, dst)) {
                     const auto renameError = std::error_code(errno, std::generic_category());
                     fileAssistant_.reopen(false);
                     curSize_ = fileAssistant_.size();
                     NOVAINFRA_THROW(std::system_error(renameError, "rotating_file_sink: failed renaming " +
-                                                                       core::FilenameToStr(src) + " to " +
-                                                                       core::FilenameToStr(dst)));
+                                                                       core::filenameToStr(src) + " to " +
+                                                                       core::filenameToStr(dst)));
                 }
             }
         }
@@ -159,19 +159,19 @@ private:
     // return true on success, false otherwise.
     bool renameFile(const Filename &src, const Filename &dst)
     {
-        core::Remove(dst);
-        return core::Rename(src, dst) == 0;
+        core::removeFile(dst);
+        return core::renameFile(src, dst) == 0;
     }
 
     Filename baseFilename_;
     std::size_t maxSize_;  // one size = one byte
     std::size_t maxFileNum_;
     std::size_t curSize_{0};
-    details::FileAssistant fileAssistant_;
+    detail::FileAssistant fileAssistant_;
 };
 
 using RotatingFileSinkMt = RotatingFileSink<std::mutex>;
-using RotatingFileSinkSt = RotatingFileSink<details::NullMutex>;
+using RotatingFileSinkSt = RotatingFileSink<detail::NullMutex>;
 
 }  // namespace log::sinks
 NOVAINFRA_NAMESPACE_END

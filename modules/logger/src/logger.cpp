@@ -46,7 +46,7 @@ void Logger::_flush()
         {
             sink->flush();
         }
-        NOVAINFRA_LOG_DETAILS_CATCH(SourceLocation())
+        NOVAINFRA_LOG_DETAIL_CATCH(SourceLocation())
     }
 }
 
@@ -64,7 +64,7 @@ std::shared_ptr<Logger> Logger::clone(std::string name)
     return cloned;
 }
 
-void Logger::sinkIt(const details::LogMsg &msg)
+void Logger::sinkIt(const detail::LogMsg &msg)
 {
     for (auto &sink : sinks_) {
         if (!sink) {
@@ -76,7 +76,7 @@ void Logger::sinkIt(const details::LogMsg &msg)
             {
                 sink->log(msg);
             }
-            NOVAINFRA_LOG_DETAILS_CATCH(msg.source)
+            NOVAINFRA_LOG_DETAIL_CATCH(msg.source)
         }
     }
     if (shouldFlush(msg.level)) {
@@ -107,7 +107,7 @@ void Logger::errHandler(const std::string &msg) NOVAINFRA_NOEXCEPT
             return;
         }
         lastReportTime = now;
-        auto tmTime = core::Localtime(SystemClock::to_time_t(now));
+        auto tmTime = core::localTime(SystemClock::to_time_t(now));
         char dateBuf[64];
         std::strftime(dateBuf, sizeof(dateBuf), "%Y-%m-%d %H:%M:%S", &tmTime);
         std::fprintf(stderr, "[*** LOG ERROR #%04zu ***] [%s] [%s] %s\n", errCnt, dateBuf, name_.c_str(),

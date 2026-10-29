@@ -6,7 +6,7 @@
 #include <logger/sinks/file_event_handlers.h>
 
 NOVAINFRA_NAMESPACE_BEGIN
-namespace log::details {
+namespace log::detail {
 
 class NOVAINFRA_LIB_PORT FileAssistant
 {
@@ -38,5 +38,5 @@ private:
     sinks::FileEventHandlers eventHandlers_;
 };
 
-}  // namespace log::details
+}  // namespace log::detail
 NOVAINFRA_NAMESPACE_END

@@ -9,7 +9,7 @@
 #include <type_traits>
 
 NOVAINFRA_NAMESPACE_BEGIN
-namespace log::details {
+namespace log::detail {
 
 template <class T>
 using RemoveCvrefType = typename std::remove_cv<typename std::remove_reference<T>::type>::type;
@@ -29,5 +29,5 @@ struct IsConvertibleToAnyFormatString
                                        IsConvertibleToBasicFormatString<T, wchar_t>::value> {
 };
 
-}  // namespace log::details
+}  // namespace log::detail
 NOVAINFRA_NAMESPACE_END

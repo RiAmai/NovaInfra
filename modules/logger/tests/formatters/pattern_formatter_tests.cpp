@@ -10,13 +10,13 @@
 
 namespace {
 
-novainfra::log::LogMsg MakeMessage(novainfra::SystemTimePoint timestamp,
+novainfra::log::LogMsg makeMessage(novainfra::SystemTimePoint timestamp,
                                    std::string_view file = "path/to/file.cpp")
 {
     return novainfra::log::LogMsg{
         timestamp,
         novainfra::log::Level::INFO,
-        novainfra::core::ThreadId(),
+        novainfra::core::threadId(),
         novainfra::log::SourceLocation{file, 42, "function"},
         "formatter",
         "message"
@@ -25,7 +25,7 @@ novainfra::log::LogMsg MakeMessage(novainfra::SystemTimePoint timestamp,
 
 TEST(PatternFormatterOutput, DefaultPatternMatchesDocumentedLayout)
 {
-    const auto message = MakeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{5}});
+    const auto message = makeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{5}});
     novainfra::log::formatters::PatternFormatter formatter(novainfra::log::formatters::PatternTimeType::UTC);
     std::string output;
 
@@ -67,7 +67,7 @@ TEST(PatternFormatterOutput, CustomPatternFormatsCoreFieldsAndEscapedPercent)
 {
     const auto timestamp =
         novainfra::SystemTimePoint{std::chrono::seconds{978307200} + std::chrono::milliseconds{5}};
-    const auto message = MakeMessage(timestamp);
+    const auto message = makeMessage(timestamp);
     novainfra::log::formatters::PatternFormatter formatter(
         "%Y-%m-%d %H:%M:%S.%e|%C|%D|%n|%l|%t|%s|%g|%@|%#|%!|%%|%v",
         novainfra::log::formatters::PatternTimeType::UTC);
@@ -82,7 +82,7 @@ TEST(PatternFormatterOutput, CustomPatternFormatsCoreFieldsAndEscapedPercent)
 
 TEST(PatternFormatterOutput, TimeAliasesAndNamesProduceExpectedValues)
 {
-    const auto message = MakeMessage(novainfra::SystemTimePoint{std::chrono::seconds{978307200}});
+    const auto message = makeMessage(novainfra::SystemTimePoint{std::chrono::seconds{978307200}});
     novainfra::log::formatters::PatternFormatter formatter("%a|%A|%b|%h|%B|%c|%D|%x|%R|%T|%X|%E|%u|%i|%o|%O",
                                                            novainfra::log::formatters::PatternTimeType::UTC);
     std::string output;
@@ -95,7 +95,7 @@ TEST(PatternFormatterOutput, TimeAliasesAndNamesProduceExpectedValues)
 
 TEST(PatternFormatterOutput, SubsecondsAndMidnightUseFixedWidth)
 {
-    const auto message = MakeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{5}});
+    const auto message = makeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{5}});
     novainfra::log::formatters::PatternFormatter formatter("%e|%f|%F|%I|%r|%p",
                                                            novainfra::log::formatters::PatternTimeType::UTC);
     std::string output;
@@ -109,7 +109,7 @@ TEST(PatternFormatterOutput, FixedWidthFastPathsHandleUpperBoundaries)
 {
     const auto timestamp =
         novainfra::SystemTimePoint{std::chrono::seconds{978307200} + std::chrono::nanoseconds{999999999}};
-    const auto message = MakeMessage(timestamp);
+    const auto message = makeMessage(timestamp);
     novainfra::log::formatters::PatternFormatter formatter("%Y-%m-%d %H:%M:%S.%e|%f|%F",
                                                            novainfra::log::formatters::PatternTimeType::UTC);
     std::string output;
@@ -121,7 +121,7 @@ TEST(PatternFormatterOutput, FixedWidthFastPathsHandleUpperBoundaries)
 
 TEST(PatternFormatterOutput, PreEpochSubsecondsAreNormalized)
 {
-    const auto message = MakeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{-1}});
+    const auto message = makeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{-1}});
     novainfra::log::formatters::PatternFormatter formatter("%Y-%m-%d %H:%M:%S.%e|%f|%F",
                                                            novainfra::log::formatters::PatternTimeType::UTC);
     std::string output;
@@ -133,7 +133,7 @@ TEST(PatternFormatterOutput, PreEpochSubsecondsAreNormalized)
 
 TEST(PatternFormatterOutput, PreEpochNanosecondsAreNormalizedAtEveryPrecision)
 {
-    const auto message = MakeMessage(novainfra::SystemTimePoint{std::chrono::nanoseconds{-1}});
+    const auto message = makeMessage(novainfra::SystemTimePoint{std::chrono::nanoseconds{-1}});
     novainfra::log::formatters::PatternFormatter formatter("%Y-%m-%d %H:%M:%S.%e|%f|%F",
                                                            novainfra::log::formatters::PatternTimeType::UTC);
     std::string output;
@@ -180,7 +180,7 @@ TEST(PatternFormatterOutput, ShortFilenameNeverReadsPastStringView)
 {
     std::string backing = "root/file.cppTAIL";
     const std::string_view file(backing.data(), std::string_view("root/file.cpp").size());
-    const auto message = MakeMessage(novainfra::SystemTimePoint{}, file);
+    const auto message = makeMessage(novainfra::SystemTimePoint{}, file);
     novainfra::log::formatters::PatternFormatter formatter("%s|%g",
                                                            novainfra::log::formatters::PatternTimeType::UTC);
     std::string output;
@@ -198,12 +198,12 @@ TEST(PatternFormatterConfiguration, RejectsInvalidPatternWithoutChangingCurrentP
     EXPECT_THROW(formatter.setPattern("trailing%"), std::invalid_argument);
 
     std::string output;
-    formatter.format(MakeMessage(novainfra::SystemTimePoint{}), output);
+    formatter.format(makeMessage(novainfra::SystemTimePoint{}), output);
     EXPECT_EQ(output, "message\n");
 
     formatter.setPattern("%%");
     output.clear();
-    formatter.format(MakeMessage(novainfra::SystemTimePoint{}), output);
+    formatter.format(makeMessage(novainfra::SystemTimePoint{}), output);
     EXPECT_EQ(output, "%\n");
 }
 
@@ -211,8 +211,8 @@ TEST(PatternFormatterConfiguration, ClonePreservesConfigurationAndResetsElapsedS
 {
     novainfra::log::formatters::PatternFormatter formatter(
         "%Y|%o|%v", novainfra::log::formatters::PatternTimeType::UTC, "<eol>");
-    auto first = MakeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{5}});
-    auto second = MakeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{15}});
+    auto first = makeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{5}});
+    auto second = makeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{15}});
     std::string output;
 
     formatter.format(first, output);
@@ -231,8 +231,8 @@ TEST(PatternFormatterConfiguration, RepeatedElapsedTokensKeepIndependentState)
 {
     novainfra::log::formatters::PatternFormatter formatter("%o|%o",
                                                            novainfra::log::formatters::PatternTimeType::UTC);
-    const auto first = MakeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{5}});
-    const auto second = MakeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{15}});
+    const auto first = makeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{5}});
+    const auto second = makeMessage(novainfra::SystemTimePoint{std::chrono::milliseconds{15}});
     std::string output;
 
     formatter.format(first, output);
@@ -256,7 +256,7 @@ TEST(PatternFormatterConcurrency, IndependentFormattersDoNotMixLocalTimeState)
         threads.emplace_back([threadIndex, firstTimestamp, secondTimestamp, &valid]() {
             novainfra::log::formatters::PatternFormatter formatter;
             const bool useFirst = (threadIndex % 2) == 0;
-            const auto message = MakeMessage(useFirst ? firstTimestamp : secondTimestamp);
+            const auto message = makeMessage(useFirst ? firstTimestamp : secondTimestamp);
             const std::string expectedYear = useFirst ? "[2001-" : "[2033-";
             for (int iteration = 0; iteration < kIterations && valid.load(); ++iteration) {
                 std::string output;

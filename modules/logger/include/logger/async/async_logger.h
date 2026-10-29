@@ -38,9 +38,9 @@ public:
     std::shared_ptr<Logger> clone(std::string name) NOVAINFRA_OVERRIDE;
 
 protected:
-    void sinkIt(const details::LogMsg &msg) NOVAINFRA_OVERRIDE;
+    void sinkIt(const detail::LogMsg &msg) NOVAINFRA_OVERRIDE;
     void _flush() NOVAINFRA_OVERRIDE;
-    void backendSinkIt(const details::LogMsg &incomingLogMsg);
+    void backendSinkIt(const detail::LogMsg &incomingLogMsg);
     void backendFlush();
     void backendFlushNoexcept() NOVAINFRA_NOEXCEPT;
 

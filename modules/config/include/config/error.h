@@ -3,6 +3,7 @@
 #include "types.h"
 
 #include <core/namespace.h>
+#include <core/macros.h>
 
 #include <cstddef>
 #include <optional>
@@ -19,7 +20,7 @@ struct NOVAINFRA_LIB_PORT Error {
     Error() = default;
     explicit Error(Diagnostic diagnostic) : diagnostics{std::move(diagnostic)} {}
 
-    bool empty() const noexcept { return diagnostics.empty(); }
+    bool empty() const NOVAINFRA_NOEXCEPT { return diagnostics.empty(); }
     std::string message() const;
 };
 
@@ -32,12 +33,12 @@ public:
     Result(const Error &error) : error_(error) {}
     Result(Error &&error) : error_(std::move(error)) {}
 
-    bool hasValue() const noexcept { return value_.has_value(); }
-    explicit operator bool() const noexcept { return hasValue(); }
+    bool hasValue() const NOVAINFRA_NOEXCEPT { return value_.has_value(); }
+    explicit operator bool() const NOVAINFRA_NOEXCEPT { return hasValue(); }
     T &value() & { return *value_; }
     const T &value() const & { return *value_; }
     T &&value() && { return std::move(*value_); }
-    const Error &error() const noexcept { return error_; }
+    const Error &error() const NOVAINFRA_NOEXCEPT { return error_; }
 
 private:
     std::optional<T> value_;
@@ -52,9 +53,9 @@ public:
     Result(const Error &error) : error_(error) {}
     Result(Error &&error) : error_(std::move(error)) {}
 
-    bool hasValue() const noexcept { return error_.empty(); }
-    explicit operator bool() const noexcept { return hasValue(); }
-    const Error &error() const noexcept { return error_; }
+    bool hasValue() const NOVAINFRA_NOEXCEPT { return error_.empty(); }
+    explicit operator bool() const NOVAINFRA_NOEXCEPT { return hasValue(); }
+    const Error &error() const NOVAINFRA_NOEXCEPT { return error_; }
 
 private:
     Error error_;

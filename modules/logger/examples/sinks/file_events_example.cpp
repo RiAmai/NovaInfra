@@ -49,12 +49,12 @@ int main()
 
     const std::vector<std::string> expectedEvents{"beforeOpen", "afterOpen", "beforeClose", "afterClose"};
     const bool callbacksValid =
-        openedFileWasValid && events == expectedEvents && novainfra::core::PathExists(kLogFile);
+        openedFileWasValid && events == expectedEvents && novainfra::core::pathExists(kLogFile);
     std::cout.flush();
 
     bool errorReported = true;
 #ifndef NOVAINFRA_NO_EXCEPTIONS
-    if (novainfra::core::PathExists("/dev/full")) {
+    if (novainfra::core::pathExists("/dev/full")) {
         errorReported = false;
         auto sink = std::make_shared<novainfra::log::sinks::BasicFileSink<std::mutex>>("/dev/full");
         sink->setPattern("%v");

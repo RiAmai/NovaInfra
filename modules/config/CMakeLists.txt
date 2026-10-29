@@ -71,8 +71,8 @@ if(NOVAINFRA_CONFIG_BUILD_EXAMPLES)
 endif()
 
 if(NOVAINFRA_CONFIG_BUILD_BENCHMARKS OR BUILD_BENCHMARKS)
-    add_executable(benchmark_config benchmarks/config_benchmark.cpp)
-    target_link_libraries(benchmark_config PRIVATE NovaInfra::Config)
+    add_executable(novainfra_config_benchmarks benchmarks/config_benchmarks.cpp)
+    target_link_libraries(novainfra_config_benchmarks PRIVATE NovaInfra::Config)
 endif()
 
 # Config tools

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <logger/details/file_assistant.h>
-#include <logger/details/mutex.h>
+#include <logger/detail/file_assistant.h>
+#include <logger/detail/mutex.h>
 #include <logger/sinks/base_sink.h>
 #include <logger/sinks/file_event_handlers.h>
 
@@ -31,18 +31,18 @@ public:
     }
 
 protected:
-    void _log(const details::LogMsg &msg) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
+    void _log(const detail::LogMsg &msg) NOVAINFRA_FINAL NOVAINFRA_OVERRIDE
     {
         fileAssistant_.write(BaseSink<Mutex>::formatMessage(msg));
     }
     void _flush() NOVAINFRA_FINAL NOVAINFRA_OVERRIDE { fileAssistant_.flush(); }
 
 private:
-    details::FileAssistant fileAssistant_;
+    detail::FileAssistant fileAssistant_;
 };
 
 using BasicFileSinkMt = BasicFileSink<std::mutex>;
-using BasicFileSinkSt = BasicFileSink<details::NullMutex>;
+using BasicFileSinkSt = BasicFileSink<detail::NullMutex>;
 
 }  // namespace log::sinks
 NOVAINFRA_NAMESPACE_END

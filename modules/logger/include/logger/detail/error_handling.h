@@ -4,7 +4,7 @@
 
 #include <string>
 
-#define NOVAINFRA_LOG_DETAILS_CATCH(location)                                                                \
+#define NOVAINFRA_LOG_DETAIL_CATCH(location)                                                                \
     NOVAINFRA_CATCH_STD_BODY({                                                                               \
         if (!location.file.empty()) {                                                                        \
             std::string str = std::string(ex.what()) + "[" + std::string(location.file) + "(" +              \

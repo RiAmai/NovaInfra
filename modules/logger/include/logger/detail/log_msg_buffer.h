@@ -1,14 +1,14 @@
 #pragma once
 
 #include <logger/types.h>
-#include <logger/details/log_msg.h>
+#include <logger/detail/log_msg.h>
 #include <core/macros.h>
 
 #include <core/namespace.h>
 
 
 NOVAINFRA_NAMESPACE_BEGIN
-namespace log::details {
+namespace log::detail {
 
 struct NOVAINFRA_LIB_PORT LogMsgBuffer : LogMsg {
     LogMsgBuffer() = default;

@@ -25,7 +25,7 @@ public:
                               std::string eol = core::kDefaultEol);
     NOVAINFRA_DISABLE_COPY(PatternFormatter)
 
-    void format(const details::LogMsg &msg, std::string &dst) NOVAINFRA_OVERRIDE;
+    void format(const detail::LogMsg &msg, std::string &dst) NOVAINFRA_OVERRIDE;
     std::unique_ptr<IFormatter> clone() const NOVAINFRA_OVERRIDE;
     void setPattern(std::string pattern);
 
@@ -106,8 +106,8 @@ private:
 
     std::tm getTime(SystemTimePoint timestamp) const;
     CompiledPattern compilePattern(const std::string &pattern) const;
-    void formatFull(const details::LogMsg &msg, const std::tm &time, FullState &state, std::string &dst);
-    void formatCommonDateTime(const details::LogMsg &msg, const std::tm &time, DateTimeState &state,
+    void formatFull(const detail::LogMsg &msg, const std::tm &time, FullState &state, std::string &dst);
+    void formatCommonDateTime(const detail::LogMsg &msg, const std::tm &time, DateTimeState &state,
                               bool withMilliseconds, std::string &dst);
 
     std::string pattern_;

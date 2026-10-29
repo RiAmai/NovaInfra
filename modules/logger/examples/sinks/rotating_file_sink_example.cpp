@@ -19,7 +19,7 @@ int main()
 
     for (std::size_t index = 0; index <= kMaxHistoryFiles; ++index) {
         const auto filename = RotatingSink::calcFilename(kLogFile, index);
-        if (novainfra::core::RemoveIfExists(filename) != 0) {
+        if (novainfra::core::removeIfExists(filename) != 0) {
             std::cerr << "Failed removing old example log: " << filename << '\n';
             return 1;
         }
@@ -40,7 +40,7 @@ int main()
     std::cout << "Rotating log files:\n";
     for (std::size_t index = 0; index <= kMaxHistoryFiles; ++index) {
         const auto filename = RotatingSink::calcFilename(kLogFile, index);
-        if (novainfra::core::PathExists(filename)) {
+        if (novainfra::core::pathExists(filename)) {
             std::cout << filename << " (" << std::filesystem::file_size(filename) << " bytes)\n";
         }
     }

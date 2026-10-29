@@ -6,7 +6,7 @@
 #include <type_traits>
 
 NOVAINFRA_NAMESPACE_BEGIN
-namespace log::details {
+namespace log::detail {
 
 struct NullMutex {
     void lock() const {}
@@ -51,5 +51,5 @@ struct ConsoleMutexTraits<MutexPolicy, std::void_t<typename MutexPolicy::Mutex>>
     static Mutex &mutex() { return MutexPolicy::mutex(); }
 };
 
-}  // namespace log::details
+}  // namespace log::detail
 NOVAINFRA_NAMESPACE_END

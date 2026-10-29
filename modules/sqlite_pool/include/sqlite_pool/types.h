@@ -15,14 +15,14 @@ namespace sqlitepool {
 using Row = std::unordered_map<std::string, std::string>;
 using RowSet = std::vector<Row>;
 
-struct PoolConfig {
+struct PoolOptions {
     Uint32 readConnections = 0;  // Number of read-only connections (0 = max(hardware_concurrency, 4))
     int pageCacheSize = -8000;   // SQLite page cache (negative = KiB; e.g. -8000 -> 8MB)
     int busyTimeoutMs = 5000;    // Busy-wait timeout in ms
     Uint32 healthCheckIntervalMs = 30000;  // Background health check interval (0 = disabled)
     std::string journalMode = "WAL";       // Journal mode (WAL strongly recommended)
     std::vector<std::string> pragmas;      // Extra PRAGMAs applied to every connection, e.g. "foreign_key=ON"
-    std::function<void(sqlite3 *, bool /*is_write*/)> postOpen = nullptr;  // Encryption / post-open hook
+    std::function<void(sqlite3 *, bool /*is_write*/)> onPostOpen = nullptr;  // Encryption / post-open hook
 };
 
 struct HealthCheckResult {

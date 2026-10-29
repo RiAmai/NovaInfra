@@ -41,7 +41,7 @@ private:
 
 TEST(Singleton, BasicUsage)
 {
-    auto instance1 = TestSingleton::Instance();
+    auto instance1 = TestSingleton::instance();
     ASSERT_NE(instance1, nullptr);
 
     instance1->setValue(42);
@@ -50,8 +50,8 @@ TEST(Singleton, BasicUsage)
 
 TEST(Singleton, SameInstance)
 {
-    auto instance1 = TestSingleton::Instance();
-    auto instance2 = TestSingleton::Instance();
+    auto instance1 = TestSingleton::instance();
+    auto instance2 = TestSingleton::instance();
 
     // Same pointer
     EXPECT_EQ(instance1.get(), instance2.get());
@@ -63,9 +63,9 @@ TEST(Singleton, SameInstance)
 
 TEST(Singleton, OnlyOneInstanceCreated)
 {
-    auto instance1 = TestSingleton::Instance();
-    auto instance2 = TestSingleton::Instance();
-    auto instance3 = TestSingleton::Instance();
+    auto instance1 = TestSingleton::instance();
+    auto instance2 = TestSingleton::instance();
+    auto instance3 = TestSingleton::instance();
 
     // All should have the same counter value (only created once)
     EXPECT_EQ(instance1->getCounter(), instance2->getCounter());
@@ -81,7 +81,7 @@ TEST(Singleton, ThreadSafety)
     // Multiple threads getting instance simultaneously
     for (int i = 0; i < numThreads; ++i) {
         threads.emplace_back([i, &pointers]() {
-            auto instance = TestSingleton::Instance();
+            auto instance = TestSingleton::instance();
             pointers[i] = instance.get();
         });
     }
@@ -97,7 +97,7 @@ TEST(Singleton, ThreadSafety)
 
 TEST(Singleton, ConcurrentAccess)
 {
-    auto instance = TestSingleton::Instance();
+    auto instance = TestSingleton::instance();
     ASSERT_NE(instance, nullptr);
 
     const int numThreads = 10;
@@ -105,12 +105,12 @@ TEST(Singleton, ConcurrentAccess)
     std::vector<std::thread> threads;
     std::vector<int> matchingInstances(numThreads, 0);
 
-    // Instance() is thread-safe; mutable instance fields need their own synchronization.
+    // instance() is thread-safe; mutable instance fields need their own synchronization.
     for (int i = 0; i < numThreads; ++i) {
         threads.emplace_back([i, expected = instance.get(), &matchingInstances]() {
             int matches = 0;
             for (int j = 0; j < accessesPerThread; ++j) {
-                if (TestSingleton::Instance().get() == expected)
+                if (TestSingleton::instance().get() == expected)
                     ++matches;
             }
             matchingInstances[i] = matches;
@@ -127,8 +127,8 @@ TEST(Singleton, ConcurrentAccess)
 
 TEST(Singleton, MultipleSingletonTypes)
 {
-    auto test = TestSingleton::Instance();
-    auto another = AnotherSingleton::Instance();
+    auto test = TestSingleton::instance();
+    auto another = AnotherSingleton::instance();
 
     // Different singleton types have different instances
     test->setValue(123);
@@ -138,8 +138,8 @@ TEST(Singleton, MultipleSingletonTypes)
     EXPECT_EQ(another->getName(), "test");
 
     // Getting them again should return same instances
-    auto test2 = TestSingleton::Instance();
-    auto another2 = AnotherSingleton::Instance();
+    auto test2 = TestSingleton::instance();
+    auto another2 = AnotherSingleton::instance();
 
     EXPECT_EQ(test.get(), test2.get());
     EXPECT_EQ(another.get(), another2.get());
@@ -147,11 +147,11 @@ TEST(Singleton, MultipleSingletonTypes)
 
 TEST(Singleton, SharedPtrSemantics)
 {
-    auto instance1 = TestSingleton::Instance();
+    auto instance1 = TestSingleton::instance();
     instance1->setValue(999);
 
     {
-        auto instance2 = TestSingleton::Instance();
+        auto instance2 = TestSingleton::instance();
         EXPECT_EQ(instance2->getValue(), 999);
 
         // Reference count increases
@@ -169,7 +169,7 @@ TEST(Singleton, CopyConstructorDisabled)
     // TestSingleton obj2(obj1);
 
     // Just verify we can get the instance
-    auto instance = TestSingleton::Instance();
+    auto instance = TestSingleton::instance();
     EXPECT_NE(instance, nullptr);
 }
 
@@ -180,6 +180,6 @@ TEST(Singleton, AssignmentOperatorDisabled)
     // obj2 = obj1;
 
     // Just verify we can get the instance
-    auto instance = TestSingleton::Instance();
+    auto instance = TestSingleton::instance();
     EXPECT_NE(instance, nullptr);
 }

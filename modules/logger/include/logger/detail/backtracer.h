@@ -1,6 +1,6 @@
 #pragma once
 
-#include <logger/details/log_msg_buffer.h>
+#include <logger/detail/log_msg_buffer.h>
 
 #include <core/namespace.h>
 #include <core/circular_queue.h>
@@ -10,7 +10,7 @@
 #include <vector>
 
 NOVAINFRA_NAMESPACE_BEGIN
-namespace log::details {
+namespace log::detail {
 
 class NOVAINFRA_LIB_PORT BackTracer
 {
@@ -94,5 +94,5 @@ private:
     CircularQueue<LogMsgBuffer> messages_;
 };
 
-}  // namespace log::details
+}  // namespace log::detail
 NOVAINFRA_NAMESPACE_END

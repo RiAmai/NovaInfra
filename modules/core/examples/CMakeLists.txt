@@ -1,5 +1,5 @@
-add_executable(example_core_producer_consumer producer_consumer.cpp)
+add_executable(example_core_producer_consumer producer_consumer_example.cpp)
 target_link_libraries(example_core_producer_consumer PRIVATE NovaInfra::Core)
 
-add_executable(example_core_circular_buffer circular_buffer.cpp)
+add_executable(example_core_circular_buffer circular_buffer_example.cpp)
 target_link_libraries(example_core_circular_buffer PRIVATE NovaInfra::Core)

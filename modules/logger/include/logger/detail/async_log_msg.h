@@ -1,7 +1,7 @@
 #pragma once
 
-#include <logger/details/log_buffer.h>
-#include <logger/details/log_msg.h>
+#include <logger/detail/log_buffer.h>
+#include <logger/detail/log_msg.h>
 #include <logger/types.h>
 
 #include <core/namespace.h>
@@ -15,7 +15,7 @@ namespace log::async {
 class AsyncLogger;
 }
 
-namespace log::details {
+namespace log::detail {
 
 enum class AsyncMsgType { LOG, FLUSH, TERMINATE };
 
@@ -112,5 +112,5 @@ private:
     std::unique_ptr<OwnedSource> dynamicSource_;
 };
 
-}  // namespace log::details
+}  // namespace log::detail
 NOVAINFRA_NAMESPACE_END

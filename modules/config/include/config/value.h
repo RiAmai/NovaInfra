@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core/export.h>
+#include <core/macros.h>
 #include <core/namespace.h>
 
 #include <cstdint>
@@ -42,13 +43,13 @@ public:
     Value(Array value) : storage_(std::move(value)) {}
     Value(Object value) : storage_(std::move(value)) {}
 
-    Type type() const noexcept;
-    bool isScalar() const noexcept;
-    const Storage &storage() const noexcept { return storage_; }
-    Storage &storage() noexcept { return storage_; }
+    Type type() const NOVAINFRA_NOEXCEPT;
+    bool isScalar() const NOVAINFRA_NOEXCEPT;
+    const Storage &storage() const NOVAINFRA_NOEXCEPT { return storage_; }
+    Storage &storage() NOVAINFRA_NOEXCEPT { return storage_; }
 
-    const Value *find(const std::string &path) const noexcept;
-    Value *find(const std::string &path) noexcept;
+    const Value *find(const std::string &path) const NOVAINFRA_NOEXCEPT;
+    Value *find(const std::string &path) NOVAINFRA_NOEXCEPT;
     const Value &at(const std::string &path) const;
     Value &operator[](const std::string &path);
     void merge(const Value &overlay);

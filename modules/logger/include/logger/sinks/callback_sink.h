@@ -1,6 +1,6 @@
 #pragma once
 
-#include <logger/details/mutex.h>
+#include <logger/detail/mutex.h>
 #include <logger/sinks/base_sink.h>
 
 #include <functional>
@@ -15,7 +15,7 @@ template <typename Mutex>
 class CallbackSink NOVAINFRA_FINAL : public BaseSink<Mutex>
 {
 public:
-    using Callback = std::function<void(const details::LogMsg &)>;
+    using Callback = std::function<void(const detail::LogMsg &)>;
 
     explicit CallbackSink(Callback callback) : callback_(std::move(callback))
     {
@@ -25,14 +25,14 @@ public:
     }
 
 private:
-    void _log(const details::LogMsg &msg) NOVAINFRA_OVERRIDE { callback_(msg); }
+    void _log(const detail::LogMsg &msg) NOVAINFRA_OVERRIDE { callback_(msg); }
     void _flush() NOVAINFRA_OVERRIDE {}
 
     Callback callback_;
 };
 
 using CallbackSinkMt = CallbackSink<std::mutex>;
-using CallbackSinkSt = CallbackSink<details::NullMutex>;
+using CallbackSinkSt = CallbackSink<detail::NullMutex>;
 
 }  // namespace log::sinks
 NOVAINFRA_NAMESPACE_END

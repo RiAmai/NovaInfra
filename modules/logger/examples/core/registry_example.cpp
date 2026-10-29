@@ -24,12 +24,12 @@ int main()
     NOVAINFRA_LOG_INFO("Global macro uses the Application logger.");
     diagnostics->trace("Name-specific TRACE override is active.");
 
-    const bool registered = novainfra_log::getNameLogger("Application") == application &&
-                            novainfra_log::getNameLogger("Diagnostics") == diagnostics &&
+    const bool registered = novainfra_log::findLogger("Application") == application &&
+                            novainfra_log::findLogger("Diagnostics") == diagnostics &&
                             novainfra_log::defaultLogger() == application;
 
     novainfra_log::dropLogger("Diagnostics");
-    const bool dropped = novainfra_log::getNameLogger("Diagnostics") == nullptr;
+    const bool dropped = novainfra_log::findLogger("Diagnostics") == nullptr;
     std::cout << "registry registered=" << std::boolalpha << registered << " dropped=" << dropped << '\n';
 
     novainfra_log::shutdown();

@@ -6,17 +6,17 @@ namespace sqlitepool {
 
 ReadConn::ReadConn(sqlite3 *db, std::shared_ptr<void> lease) : db_(db), lease_(std::move(lease)) {}
 
-ReadConn::ReadConn(ReadConn &&o) NOVAINFRA_NOEXCEPT : db_(o.db_), lease_(std::move(o.lease_))
+ReadConn::ReadConn(ReadConn &&other) NOVAINFRA_NOEXCEPT : db_(other.db_), lease_(std::move(other.lease_))
 {
-    o.db_ = nullptr;
+    other.db_ = nullptr;
 }
 
-ReadConn &ReadConn::operator=(ReadConn &&o) NOVAINFRA_NOEXCEPT
+ReadConn &ReadConn::operator=(ReadConn &&other) NOVAINFRA_NOEXCEPT
 {
-    if (this != &o) {
-        db_ = o.db_;
-        lease_ = std::move(o.lease_);
-        o.db_ = nullptr;
+    if (this != &other) {
+        db_ = other.db_;
+        lease_ = std::move(other.lease_);
+        other.db_ = nullptr;
     }
     return *this;
 }

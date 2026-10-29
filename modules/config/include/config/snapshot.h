@@ -3,6 +3,8 @@
 #include "error.h"
 #include "value.h"
 
+#include <core/macros.h>
+
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -20,9 +22,9 @@ public:
     Snapshot() : data_(emptyData()) {}
     explicit Snapshot(Value root) : Snapshot(std::move(root), {}) {}
 
-    const Value &root() const noexcept { return data_ ? data_->root : emptyData()->root; }
-    const Value *find(const std::string &path) const noexcept { return root().find(path); }
-    bool contains(const std::string &path) const noexcept { return find(path) != nullptr; }
+    const Value &root() const NOVAINFRA_NOEXCEPT { return data_ ? data_->root : emptyData()->root; }
+    const Value *find(const std::string &path) const NOVAINFRA_NOEXCEPT { return root().find(path); }
+    bool contains(const std::string &path) const NOVAINFRA_NOEXCEPT { return find(path) != nullptr; }
     std::string dump(bool redact = true) const
     {
         if (!redact || !data_ || data_->secrets.empty())

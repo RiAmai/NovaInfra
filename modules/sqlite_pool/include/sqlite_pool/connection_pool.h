@@ -20,7 +20,7 @@ struct PoolState;
 class ConnectionPool
 {
 public:
-    explicit ConnectionPool(const std::string &path, PoolConfig config = {});
+    explicit ConnectionPool(const std::string &path, PoolOptions config = {});
     ~ConnectionPool();
     NOVAINFRA_DISABLE_COPY_MOVE(ConnectionPool)
 
@@ -53,7 +53,7 @@ private:
     void stopHealthThread() NOVAINFRA_NOEXCEPT;
 
     std::string path_;
-    PoolConfig config_;
+    PoolOptions config_;
     std::shared_ptr<PoolState> state_;
     std::thread healthThread_;
     mutable std::mutex healthMtx_;
